@@ -329,25 +329,66 @@ export async function fetchVercelBilling(
   teamId: string | null
 ): Promise<BillingResult | null> {
   try {
-    const url = teamId
-      ? `https://api.vercel.com/v2/billing?teamId=${teamId}`
-      : "https://api.vercel.com/v2/billing";
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    const teamParam = teamId ? `?teamId=${teamId}` : "";
 
-    const billingRes = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    // 1. Try invoices — most reliable source of actual charges
+    const invoicesRes = await fetch(
+      `https://api.vercel.com/v2/payment/invoices${teamParam}`,
+      { headers }
+    );
+    if (invoicesRes.ok) {
+      const invoicesData = await invoicesRes.json();
+      const invoices: Array<{ total: number; period?: { start: number; end: number }; state?: string }> =
+        invoicesData.invoices ?? invoicesData ?? [];
+      // Most recent invoice first; take first paid/issued one
+      const latest = invoices.find((inv) => inv.state !== "draft") ?? invoices[0];
+      if (latest && latest.total > 0) {
+        return {
+          vendorId: "vercel",
+          planName: "Vercel Pro",
+          monthlySpendUsd: Math.round(latest.total * 100) / 100,
+          source: "billing_api",
+        };
+      }
+    }
 
+    // 2. Try /v2/billing — sometimes has period totals
+    const billingRes = await fetch(
+      `https://api.vercel.com/v2/billing${teamParam}`,
+      { headers }
+    );
     if (billingRes.ok) {
       const data = await billingRes.json();
-      const spend = data.billing?.period?.total ?? data.total ?? 0;
+      // Various shapes Vercel has returned over time
+      const spend =
+        data.billing?.period?.total ??
+        data.period?.total ??
+        data.total ??
+        0;
       if (spend > 0) {
         return {
           vendorId: "vercel",
-          planName: "Vercel",
+          planName: "Vercel Pro",
           monthlySpendUsd: Math.round(Number(spend) * 100) / 100,
           source: "billing_api",
         };
       }
+    }
+
+    // 3. Fall back to plan name from team/user info
+    const teamRes = teamId
+      ? await fetch(`https://api.vercel.com/v2/teams/${teamId}`, { headers })
+      : await fetch("https://api.vercel.com/v2/user", { headers });
+    if (teamRes.ok) {
+      const teamData = await teamRes.json();
+      const plan: string = teamData.plan ?? teamData.user?.defaultTeamId ?? "pro";
+      return {
+        vendorId: "vercel",
+        planName: `Vercel ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
+        monthlySpendUsd: 0,
+        source: "billing_api",
+      };
     }
 
     return {
