@@ -1,6 +1,7 @@
 import { inngest } from "../client";
 import { db } from "@/lib/db";
 import { scanWorkspace } from "@api-spend/scanner";
+import { fetchBillingForKeys } from "@/lib/billing";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,7 +59,7 @@ export const scanProject = inngest.createFunction(
     concurrency: { limit: 5 },
   },
   async ({ event }: { event: { data: Record<string, string> } }) => {
-    const { scanId, projectId, type, userId, repoOwner, repoName } = event.data;
+    const { scanId, projectId, type, userId, repoOwner, repoName, fetchBilling } = event.data;
 
     await db.scan.update({
       where: { id: scanId },
@@ -94,7 +95,7 @@ export const scanProject = inngest.createFunction(
         throw new Error(`Unknown scan type: ${type}`);
       }
 
-      const summary = await scanWorkspace(tempDir);
+      const summary = await scanWorkspace(tempDir, { captureRawKeys: fetchBilling === "true" });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.scan as any).update({
@@ -130,6 +131,36 @@ export const scanProject = inngest.createFunction(
         },
       });
 
+      // Fetch real billing data if user consented and keys were found
+      const billingResults = (fetchBilling === "true" && summary.rawApiKeys?.length)
+        ? await fetchBillingForKeys(summary.rawApiKeys)
+        : [];
+
+      // Upsert real billing data (overrides estimates)
+      for (const result of billingResults) {
+        await db.vendorPlan.upsert({
+          where: { projectId_vendorId: { projectId, vendorId: result.vendorId } },
+          update: {
+            planName: result.planName,
+            monthlySpendUsd: result.monthlySpendUsd,
+            usageIncluded: result.usageIncluded ?? null,
+            unit: result.unit ?? null,
+            source: "billing_api",
+          },
+          create: {
+            projectId,
+            vendorId: result.vendorId,
+            planName: result.planName,
+            monthlySpendUsd: result.monthlySpendUsd,
+            usageIncluded: result.usageIncluded ?? null,
+            unit: result.unit ?? null,
+            source: "billing_api",
+          },
+        });
+      }
+
+      const billingVendorIds = new Set(billingResults.map((r) => r.vendorId));
+
       // Auto-create estimated vendor plans for newly detected vendors
       const existingPlans = await db.vendorPlan.findMany({
         where: { projectId },
@@ -139,6 +170,7 @@ export const scanProject = inngest.createFunction(
 
       for (const finding of summary.findings) {
         if (existingVendorIds.has(finding.vendorId)) continue;
+        if (billingVendorIds.has(finding.vendorId)) continue; // already have real data
 
         // Find the most popular tier, or fall back to cheapest paid tier
         const tier = await db.vendorPricingTier.findFirst({

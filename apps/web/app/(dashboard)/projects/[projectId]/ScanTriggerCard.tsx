@@ -26,6 +26,7 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
   const [result, setResult] = useState<PollResult | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [fetchBilling, setFetchBilling] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll scan status until terminal state
@@ -85,6 +86,7 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
   function handleGitHub() {
     const fd = new FormData();
     fd.append("type", "github");
+    fd.append("fetchBilling", fetchBilling ? "true" : "false");
     triggerScan(fd);
   }
 
@@ -92,6 +94,7 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
     const fd = new FormData();
     fd.append("type", "zip");
     fd.append("file", file);
+    fd.append("fetchBilling", fetchBilling ? "true" : "false");
     triggerScan(fd);
   }
 
@@ -116,6 +119,39 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
       <p className="muted small" style={{ marginBottom: 16 }}>
         Detect APIs, secrets, and pricing models used in your codebase.
       </p>
+
+      {/* Billing consent */}
+      <label
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+          padding: "10px 14px",
+          background: "var(--panel-2)",
+          borderRadius: 10,
+          border: `1px solid ${fetchBilling ? "var(--accent)" : "var(--border)"}`,
+          cursor: "pointer",
+          marginBottom: 12,
+          transition: "border-color 0.15s",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={fetchBilling}
+          onChange={(e) => setFetchBilling(e.target.checked)}
+          style={{ marginTop: 2, accentColor: "var(--accent)", flexShrink: 0 }}
+          disabled={busy}
+        />
+        <div>
+          <div className="small" style={{ fontWeight: 500, marginBottom: 2 }}>
+            Fetch real billing data
+          </div>
+          <p className="muted" style={{ fontSize: 11, lineHeight: 1.5, margin: 0 }}>
+            If API keys are found in your code, we&apos;ll use them to query vendor usage APIs
+            for accurate spend data. Keys are used transiently and never stored.
+          </p>
+        </div>
+      </label>
 
       <div className="stack gap-10">
         {/* GitHub scan */}

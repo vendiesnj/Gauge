@@ -77,6 +77,12 @@ export interface ScanSummary {
     line: number;
   }>;
   notes: string[];
+  // Only populated when captureRawKeys: true — never stored in DB
+  rawApiKeys?: Array<{
+    vendorId: string;
+    pattern: string;
+    value: string;
+  }>;
 }
 
 export interface RuntimeUsageEvent {

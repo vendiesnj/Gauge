@@ -34,6 +34,7 @@ export async function POST(
 
   const formData = await req.formData();
   const type = formData.get("type") as string;
+  const fetchBilling = formData.get("fetchBilling") as string | null;
 
   if (type !== "github" && type !== "zip") {
     return NextResponse.json(
@@ -74,6 +75,7 @@ export async function POST(
       userId: session.user.id,
       repoOwner: project.repoOwner ?? "",
       repoName: project.repoName ?? "",
+      fetchBilling: fetchBilling ?? "false",
     },
   });
 
