@@ -80,6 +80,7 @@ export default async function ProjectDetailPage({
   const totalSpend = insights.reduce((s, i) => s + i.monthlySpendUsd, 0);
   const totalUnused = insights.reduce((s, i) => s + i.estimatedUnusedSpendUsd, 0);
   const totalAlt = insights.reduce((s, i) => s + (i.alternativeStackMonthlyUsd ?? i.monthlySpendUsd), 0);
+  const hasEstimates = project.vendorPlans.some((p) => p.source === "estimated");
 
   // Latest scan
   const latestScan = project.scans[0];
@@ -131,6 +132,7 @@ export default async function ProjectDetailPage({
           <div className="kpi">{totalSpend > 0 ? `$${totalSpend.toLocaleString()}` : "—"}</div>
           <div className="muted small" style={{ marginTop: 4 }}>
             {plans.length > 0 ? `${plans.length} vendor${plans.length !== 1 ? "s" : ""} with plans` : "Add vendor plans below"}
+            {hasEstimates && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--warn)" }}>· based on estimates</span>}
           </div>
         </div>
         <div className="card">
@@ -200,7 +202,12 @@ export default async function ProjectDetailPage({
                         </td>
                         <td>
                           {plan ? (
-                            <span className="text-good small">{plan.planName}</span>
+                            <span className="row gap-4" style={{ alignItems: "center" }}>
+                              <span className="small" style={{ fontWeight: 500 }}>{plan.planName}</span>
+                              {plan.source === "estimated" && (
+                                <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: "rgba(234,179,8,0.15)", color: "var(--warn)", border: "1px solid rgba(234,179,8,0.3)" }}>est</span>
+                              )}
+                            </span>
                           ) : (
                             <span className="muted small">{vendorDef?.pricingModel ?? "—"}</span>
                           )}

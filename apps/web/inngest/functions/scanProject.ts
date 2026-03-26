@@ -130,6 +130,36 @@ export const scanProject = inngest.createFunction(
         },
       });
 
+      // Auto-create estimated vendor plans for newly detected vendors
+      const existingPlans = await db.vendorPlan.findMany({
+        where: { projectId },
+        select: { vendorId: true },
+      });
+      const existingVendorIds = new Set(existingPlans.map((p) => p.vendorId));
+
+      for (const finding of summary.findings) {
+        if (existingVendorIds.has(finding.vendorId)) continue;
+
+        // Find the most popular tier, or fall back to cheapest paid tier
+        const tier = await db.vendorPricingTier.findFirst({
+          where: { vendorId: finding.vendorId, isFreeTier: false },
+          orderBy: [{ isMostPopular: "desc" }, { tierOrder: "asc" }],
+        });
+        if (!tier) continue;
+
+        await db.vendorPlan.create({
+          data: {
+            projectId,
+            vendorId: finding.vendorId,
+            planName: tier.tierName,
+            monthlySpendUsd: tier.monthlyBaseUsd > 0 ? tier.monthlyBaseUsd : null,
+            usageIncluded: tier.includedUnits > 0 ? tier.includedUnits : null,
+            unit: tier.usageUnitLabel,
+            source: "estimated",
+          },
+        });
+      }
+
       return {
         scanId,
         vendorsDetected: summary.findings.length,
