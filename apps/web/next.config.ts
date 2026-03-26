@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   experimental: {
     typedRoutes: false
   },
-  serverExternalPackages: ["unzipper"]
+  serverExternalPackages: ["unzipper", "pg", "pg-native"]
 };
 
 export default nextConfig;
