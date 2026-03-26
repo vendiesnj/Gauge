@@ -1,9 +1,11 @@
 import { defineConfig } from "prisma/config";
+import * as dotenv from "dotenv";
 
-// Prisma v7 config
-// - Database URL is passed to PrismaClient via `datasourceUrl` in lib/db.ts
-// - For migrations: DATABASE_URL must be set, then run:
-//   pnpm exec prisma migrate dev --name init
+dotenv.config();
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
+  datasource: {
+    url: process.env.DATABASE_URL,
+  },
 });
