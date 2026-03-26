@@ -19,31 +19,40 @@ async function fetchOpenAI(key: string): Promise<BillingResult | null> {
     const now = new Date();
     const startOfMonth = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
 
-    const res = await fetch(
-      `https://api.openai.com/v1/organization/usage/completions?start_time=${startOfMonth}&limit=30`,
+    // Try the org usage endpoint (requires usage.read scope)
+    const usageRes = await fetch(
+      `https://api.openai.com/v1/organization/usage/completions?start_time=${startOfMonth}&limit=100`,
       { headers: { Authorization: `Bearer ${key}` } }
     );
-    if (!res.ok) return null;
-    const data = await res.json();
 
-    // Sum up input + output tokens across all models/days
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-    for (const item of data.data ?? []) {
-      totalInputTokens += item.input_tokens ?? 0;
-      totalOutputTokens += item.output_tokens ?? 0;
+    if (usageRes.ok) {
+      const data = await usageRes.json();
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      for (const item of data.data ?? []) {
+        totalInputTokens += item.input_tokens ?? 0;
+        totalOutputTokens += item.output_tokens ?? 0;
+      }
+      const estimatedCost = (totalInputTokens / 1_000_000) * 0.15 + (totalOutputTokens / 1_000_000) * 0.60;
+      return {
+        vendorId: "openai",
+        planName: "Pay-as-you-go",
+        monthlySpendUsd: Math.round(estimatedCost * 100) / 100,
+        source: "billing_api",
+      };
     }
 
-    // Estimate cost using GPT-4o mini rates (most common) — $0.15/1M input, $0.60/1M output
-    const estimatedCost = (totalInputTokens / 1_000_000) * 0.15 + (totalOutputTokens / 1_000_000) * 0.60;
-    const totalTokens = totalInputTokens + totalOutputTokens;
+    // Fallback: verify the key is valid via models endpoint
+    const validRes = await fetch("https://api.openai.com/v1/models?limit=1", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!validRes.ok) return null;
 
+    // Key is valid but no usage data available — return $0 so it shows as detected
     return {
       vendorId: "openai",
       planName: "Pay-as-you-go",
-      monthlySpendUsd: Math.round(estimatedCost * 100) / 100,
-      usageIncluded: Math.round(totalTokens / 1000),
-      unit: "k tokens this month",
+      monthlySpendUsd: 0,
       source: "billing_api",
     };
   } catch {
@@ -57,8 +66,9 @@ async function fetchAnthropic(key: string): Promise<BillingResult | null> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
 
-    const res = await fetch(
-      `https://api.anthropic.com/v1/usage?start_date=${startOfMonth}`,
+    // Try usage API (requires admin key with usage:read scope)
+    const usageRes = await fetch(
+      `https://api.anthropic.com/v1/organizations/usage?start_date=${startOfMonth}`,
       {
         headers: {
           "x-api-key": key,
@@ -66,26 +76,34 @@ async function fetchAnthropic(key: string): Promise<BillingResult | null> {
         },
       }
     );
-    if (!res.ok) return null;
-    const data = await res.json();
 
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-    for (const item of data.data ?? []) {
-      totalInputTokens += item.input_tokens ?? 0;
-      totalOutputTokens += item.output_tokens ?? 0;
+    if (usageRes.ok) {
+      const data = await usageRes.json();
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      for (const item of data.data ?? []) {
+        totalInputTokens += item.input_tokens ?? 0;
+        totalOutputTokens += item.output_tokens ?? 0;
+      }
+      const estimatedCost = (totalInputTokens / 1_000_000) * 3 + (totalOutputTokens / 1_000_000) * 15;
+      return {
+        vendorId: "anthropic",
+        planName: "Pay-as-you-go",
+        monthlySpendUsd: Math.round(estimatedCost * 100) / 100,
+        source: "billing_api",
+      };
     }
 
-    // Estimate using Sonnet 3.5 rates — $3/1M input, $15/1M output
-    const estimatedCost = (totalInputTokens / 1_000_000) * 3 + (totalOutputTokens / 1_000_000) * 15;
-    const totalTokens = totalInputTokens + totalOutputTokens;
+    // Fallback: verify key is valid
+    const validRes = await fetch("https://api.anthropic.com/v1/models", {
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+    });
+    if (!validRes.ok) return null;
 
     return {
       vendorId: "anthropic",
       planName: "Pay-as-you-go",
-      monthlySpendUsd: Math.round(estimatedCost * 100) / 100,
-      usageIncluded: Math.round(totalTokens / 1000),
-      unit: "k tokens this month",
+      monthlySpendUsd: 0,
       source: "billing_api",
     };
   } catch {
