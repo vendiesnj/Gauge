@@ -7,6 +7,7 @@ import { AddPlanForm } from "./AddPlanForm";
 import { ScanTriggerCard } from "./ScanTriggerCard";
 import { ApiTokenCard } from "./ApiTokenCard";
 import { GlidepathSection } from "./GlidepathSection";
+import { RecalculateButton } from "./RecalculateButton";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -129,29 +130,33 @@ export default async function ProjectDetailPage({
       <div className="grid-3" style={{ margin: "20px 0" }}>
         <div className="card">
           <div className="kpi-label">Monthly spend</div>
-          <div className="kpi">{totalSpend > 0 ? `$${totalSpend.toLocaleString()}` : "—"}</div>
+          <div className="kpi">
+            {plans.length > 0 ? `$${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—"}
+          </div>
           <div className="muted small" style={{ marginTop: 4 }}>
-            {plans.length > 0 ? `${plans.length} vendor${plans.length !== 1 ? "s" : ""} with plans` : "Add vendor plans below"}
+            {plans.length > 0 ? `${plans.length} vendor${plans.length !== 1 ? "s" : ""} tracked` : "Add vendor plans below"}
             {hasEstimates && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--warn)" }}>· based on estimates</span>}
           </div>
         </div>
         <div className="card">
           <div className="kpi-label">Unused spend</div>
           <div className="kpi" style={{ color: totalUnused > 0 ? "var(--warn)" : undefined }}>
-            {totalUnused > 0 ? `$${totalUnused.toFixed(0)}` : "—"}
+            {plans.length > 0 ? `$${totalUnused.toFixed(0)}` : "—"}
           </div>
           <div className="muted small" style={{ marginTop: 4 }}>
-            {totalUnused > 0 ? "Included capacity not used" : "Add usage data to detect waste"}
+            {totalUnused > 0 ? "Paid capacity not being used" : "Upload .env to detect wasted capacity"}
           </div>
         </div>
         <div className="card">
-          <div className="kpi-label">Alt stack estimate</div>
-          <div className="kpi" style={{ color: totalAlt < totalSpend ? "var(--good)" : undefined }}>
-            {totalSpend > 0 ? `$${totalAlt.toFixed(0)}` : "—"}
+          <div className="kpi-label">Potential savings</div>
+          <div className="kpi" style={{ color: totalSpend > 0 && totalAlt < totalSpend ? "var(--good)" : undefined }}>
+            {plans.length > 0 && totalSpend > 0 ? `$${(totalSpend - totalAlt).toFixed(0)}/mo` : "—"}
           </div>
           <div className="muted small" style={{ marginTop: 4 }}>
-            {totalSpend > 0 && totalAlt < totalSpend
-              ? `~$${(totalSpend - totalAlt).toFixed(0)}/mo savings possible`
+            {plans.length > 0 && totalSpend > 0
+              ? totalAlt < totalSpend
+                ? `vs $${totalAlt.toFixed(0)}/mo alt stack`
+                : "Already on optimal stack"
               : "Based on detected alternatives"}
           </div>
         </div>
@@ -223,7 +228,10 @@ export default async function ProjectDetailPage({
           {/* Spend & recommendations */}
           {insights.length > 0 && (
             <div className="card">
-              <div className="heading-sm" style={{ marginBottom: 14 }}>Spend & recommendations</div>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
+                <div className="heading-sm">Spend & recommendations</div>
+                <RecalculateButton projectId={projectId} />
+              </div>
               <table className="table">
                 <thead>
                   <tr>

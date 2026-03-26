@@ -182,12 +182,7 @@ export function GlidepathChart({
   usageUnitLabel,
 }: GlidepathProps) {
   if (!tiers.length) {
-    return (
-      <div className="card" style={{ padding: 20 }}>
-        <div className="heading-sm" style={{ marginBottom: 6 }}>{vendorName}</div>
-        <p className="muted small">No pricing tier data available yet.</p>
-      </div>
-    );
+    return <p className="muted small">No pricing tier data available for {vendorName}.</p>;
   }
 
   // Build x-axis range: 0 → max(currentUsage * 4, highest tier breakpoint * 2, min sensible)
@@ -228,11 +223,10 @@ export function GlidepathChart({
   }
 
   return (
-    <div className="card" style={{ padding: 20 }}>
+    <div>
       {/* Header */}
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
         <div>
-          <div className="heading-sm">{vendorName} — cost at scale</div>
           <div className="muted small" style={{ marginTop: 3 }}>Monthly cost by usage volume</div>
         </div>
         {currentUsage != null && (
@@ -402,4 +396,5 @@ export function GlidepathChart({
       </div>
     </div>
   );
+}
 }

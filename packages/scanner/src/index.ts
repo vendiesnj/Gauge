@@ -12,6 +12,9 @@ const TEXT_GLOBS = [
   ".env*",
 ];
 
+// Files where domain/import/key matches are likely documentation noise
+const DOC_FILE_RE = /\.(md|txt|rst|adoc)$/i;
+
 const IGNORE = [
   "**/node_modules/**",
   "**/.git/**",
@@ -97,6 +100,10 @@ function scanFile(
   rawApiKeys: NonNullable<ScanSummary["rawApiKeys"]> | null
 ) {
   const lineIdx = buildLineIndex(content);
+  // Doc files: skip import/domain/key detection (READMEs mention vendors as context, not usage)
+  const isDoc = DOC_FILE_RE.test(relPath);
+  // Test files: downgrade confidence for import matches
+  const isTest = /\.(test|spec)\.[jt]sx?$/.test(relPath);
 
   for (const { vendor, depRe, importRe, envRe, domainRe, keyRe } of COMPILED) {
     const evidences: DetectionEvidence[] = [];
@@ -106,24 +113,30 @@ function scanFile(
       for (const m of content.matchAll(re))
         pushEvidence(evidences, "dependency", relPath, lineAt(lineIdx, m.index ?? 0), m[0], "medium");
 
-    for (const re of importRe)
-      for (const m of content.matchAll(re))
-        pushEvidence(evidences, "import", relPath, lineAt(lineIdx, m.index ?? 0), m[0], "high");
+    if (!isDoc) {
+      for (const re of importRe)
+        for (const m of content.matchAll(re))
+          pushEvidence(evidences, "import", relPath, lineAt(lineIdx, m.index ?? 0), m[0], isTest ? "medium" : "high");
+    }
 
     for (const re of envRe)
       for (const m of content.matchAll(re))
         pushEvidence(evidences, "env_var", relPath, lineAt(lineIdx, m.index ?? 0), m[0], "medium");
 
-    for (const re of domainRe)
-      for (const m of content.matchAll(re))
-        pushEvidence(evidences, "domain", relPath, lineAt(lineIdx, m.index ?? 0), m[0], "high");
+    if (!isDoc) {
+      for (const re of domainRe)
+        for (const m of content.matchAll(re))
+          pushEvidence(evidences, "domain", relPath, lineAt(lineIdx, m.index ?? 0), m[0], "high");
+    }
 
-    for (const { pattern, re } of keyRe) {
-      for (const m of content.matchAll(re)) {
-        const line = lineAt(lineIdx, m.index ?? 0);
-        detectedApiKeys.push({ pattern, filePath: relPath, line, redactedValue: redact(m[0]) });
-        pushEvidence(evidences, "api_key_pattern", relPath, line, redact(m[0]), "high");
-        if (rawApiKeys) rawApiKeys.push({ vendorId: vendor.id, pattern, value: m[0] });
+    if (!isDoc) {
+      for (const { pattern, re } of keyRe) {
+        for (const m of content.matchAll(re)) {
+          const line = lineAt(lineIdx, m.index ?? 0);
+          detectedApiKeys.push({ pattern, filePath: relPath, line, redactedValue: redact(m[0]) });
+          pushEvidence(evidences, "api_key_pattern", relPath, line, redact(m[0]), "high");
+          if (rawApiKeys) rawApiKeys.push({ vendorId: vendor.id, pattern, value: m[0] });
+        }
       }
     }
 
@@ -181,12 +194,17 @@ export async function scanWorkspace(
     );
   }
 
-  // Filter false positives: require at least one high-confidence evidence
-  // (import, domain, api_key_pattern) OR 2+ distinct evidence source types.
+  // Filter false positives:
+  // - Must have 1+ high-confidence evidence (import, domain, api_key_pattern) AND 2+ total evidences, OR
+  // - 2+ distinct evidence source types (e.g. dependency + env_var), OR
+  // - An api_key_pattern match (single key is definitive)
   const HIGH: DetectionEvidence["source"][] = ["import", "domain", "api_key_pattern"];
   const findings = [...findingMap.values()].filter((f) => {
     const sources = new Set(f.evidences.map((e) => e.source));
-    return f.evidences.some((e) => HIGH.includes(e.source)) || sources.size >= 2;
+    const hasKey = f.evidences.some((e) => e.source === "api_key_pattern");
+    const hasHighNonKey = f.evidences.some((e) => e.source === "import" || e.source === "domain");
+    const totalCount = f.evidences.length;
+    return hasKey || (hasHighNonKey && totalCount >= 2) || sources.size >= 2;
   }).sort((a, b) => b.evidences.length - a.evidences.length);
 
   return {

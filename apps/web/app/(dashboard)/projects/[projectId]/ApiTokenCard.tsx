@@ -51,14 +51,14 @@ export function ApiTokenCard({ projectId, tokens }: { projectId: string; tokens:
   return (
     <div className="card">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-        <div className="heading-sm">API tokens</div>
+        <div className="heading-sm">Ingest tokens</div>
         <button className="btn btn-secondary btn-sm" onClick={() => setShowForm(!showForm)}>
           {showForm ? "Cancel" : "+ New token"}
         </button>
       </div>
 
       <p className="muted small" style={{ marginBottom: 12 }}>
-        Use these tokens with the VS Code extension or runtime ingest SDK.
+        These tokens let external tools send usage data to this project — for example the VS Code extension or a runtime SDK. Not the same as your vendor API keys.
       </p>
 
       {showForm && (

@@ -14,17 +14,20 @@ interface VendorPricing {
 export function GlidepathSection({ projectId }: { projectId: string }) {
   const [vendors, setVendors] = useState<VendorPricing[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}/pricing`)
       .then((r) => r.json())
-      .then((d) => setVendors(d.vendors ?? []))
+      .then((d) => {
+        const withTiers = (d.vendors ?? []).filter((v: VendorPricing) => v.tiers.length > 0);
+        setVendors(withTiers);
+        if (withTiers.length > 0) setSelectedVendorId(withTiers[0].vendorId);
+      })
       .catch(() => setError("Failed to load pricing data"));
   }, [projectId]);
 
-  if (error) {
-    return <p className="muted small">{error}</p>;
-  }
+  if (error) return <p className="muted small">{error}</p>;
 
   if (vendors === null) {
     return (
@@ -39,39 +42,59 @@ export function GlidepathSection({ projectId }: { projectId: string }) {
     );
   }
 
-  // Only show vendors that have pricing tier data
-  const withTiers = vendors.filter((v) => v.tiers.length > 0);
-
-  if (withTiers.length === 0) {
+  if (vendors.length === 0) {
     return (
       <div className="card" style={{ padding: "20px 24px" }}>
         <div className="heading-sm" style={{ marginBottom: 6 }}>Cost at scale</div>
-        <p className="muted small">
-          {vendors.length === 0
-            ? "Run a scan to detect vendors, then pricing tiers will appear here."
-            : "No pricing tier data available for the detected vendors yet. Seed the database to see glidepath charts."}
-        </p>
+        <p className="muted small">Run a scan to detect vendors — pricing tiers will appear here.</p>
       </div>
     );
   }
 
+  const selected = vendors.find((v) => v.vendorId === selectedVendorId) ?? vendors[0];
+
   return (
-    <div className="stack gap-16">
-      <div>
-        <h2 className="heading-sm" style={{ marginBottom: 4 }}>Cost at scale</h2>
-        <p className="muted small">How each vendor's cost grows with usage — and when to upgrade.</p>
+    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      {/* Header with vendor picker */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 20px",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div>
+          <div className="heading-sm">Cost at scale</div>
+          <p className="muted small" style={{ marginTop: 2 }}>
+            How cost grows with usage — and when to switch tiers.
+          </p>
+        </div>
+        <select
+          className="select"
+          value={selectedVendorId ?? ""}
+          onChange={(e) => setSelectedVendorId(e.target.value)}
+          style={{ width: "auto", minWidth: 140 }}
+        >
+          {vendors.map((v) => (
+            <option key={v.vendorId} value={v.vendorId}>{v.vendorName}</option>
+          ))}
+        </select>
       </div>
-      {withTiers.map((v) => (
+
+      {/* Chart for selected vendor */}
+      <div style={{ padding: 20, paddingTop: 16 }}>
         <GlidepathChart
-          key={v.vendorId}
-          vendorId={v.vendorId}
-          vendorName={v.vendorName}
-          tiers={v.tiers}
-          currentUsage={v.currentUsage?.quantity ?? null}
-          currentPlan={v.currentPlan?.planName ?? null}
-          usageUnitLabel={v.tiers[0]?.usageUnitLabel ?? "units"}
+          key={selected.vendorId}
+          vendorId={selected.vendorId}
+          vendorName={selected.vendorName}
+          tiers={selected.tiers}
+          currentUsage={selected.currentUsage?.quantity ?? null}
+          currentPlan={selected.currentPlan?.planName ?? null}
+          usageUnitLabel={selected.tiers[0]?.usageUnitLabel ?? "units"}
         />
-      ))}
+      </div>
     </div>
   );
 }

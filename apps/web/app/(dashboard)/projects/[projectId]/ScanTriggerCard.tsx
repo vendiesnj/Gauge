@@ -27,6 +27,9 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
   const [errorMsg, setErrorMsg] = useState("");
   const [dragging, setDragging] = useState(false);
   const [fetchBilling, setFetchBilling] = useState(true);
+  const [envStatus, setEnvStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [envMsg, setEnvMsg] = useState("");
+  const envFileRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll scan status until terminal state
@@ -102,6 +105,32 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
     const file = e.target.files?.[0];
     if (file) handleZip(file);
     e.target.value = "";
+  }
+
+  async function handleEnvFile(file: File) {
+    setEnvStatus("loading");
+    setEnvMsg("");
+    try {
+      const text = await file.text();
+      const res = await fetch(`/api/projects/${projectId}/billing/recalculate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ envContent: text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      if (data.updated > 0) {
+        setEnvMsg(`Updated billing data for: ${data.vendors.join(", ")}`);
+        setEnvStatus("done");
+        router.refresh();
+      } else {
+        setEnvMsg("No matching vendor API keys found in .env file.");
+        setEnvStatus("error");
+      }
+    } catch {
+      setEnvStatus("error");
+      setEnvMsg("Failed to process .env file.");
+    }
   }
 
   function onDrop(e: React.DragEvent) {
@@ -243,6 +272,52 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
             disabled={busy}
           />
         </label>
+
+        {/* .env upload for billing accuracy */}
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--bg2)",
+          }}
+        >
+          <div className="row gap-8" style={{ marginBottom: 6 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span className="small" style={{ fontWeight: 500 }}>Upload .env for exact billing data</span>
+          </div>
+          <p className="muted" style={{ fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
+            Most teams don&apos;t commit API keys to GitHub. Drop your <code>.env</code> here to fetch real spend from vendor billing APIs. Keys are used once and never stored.
+          </p>
+          <div className="row gap-8">
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => envFileRef.current?.click()}
+              disabled={envStatus === "loading"}
+            >
+              {envStatus === "loading" ? "Fetching billing…" : "Upload .env"}
+            </button>
+            {envStatus === "done" && (
+              <span className="small" style={{ color: "var(--good)" }}>{envMsg}</span>
+            )}
+            {envStatus === "error" && (
+              <span className="small" style={{ color: "var(--danger)" }}>{envMsg}</span>
+            )}
+          </div>
+          <input
+            ref={envFileRef}
+            type="file"
+            accept=".env,.env.local,.env.production,text/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleEnvFile(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
       </div>
 
       {/* Status banner */}
