@@ -6,8 +6,7 @@ import { db } from "@/lib/db";
  * Runs every Monday at 9am UTC.
  */
 export const weeklyProjectScan = inngest.createFunction(
-  { id: "weekly-project-scan", name: "Weekly auto-scan all GitHub projects" },
-  { cron: "0 9 * * 1" }, // Monday 9am UTC
+  { id: "weekly-project-scan", name: "Weekly auto-scan all GitHub projects", triggers: [{ cron: "0 9 * * 1" }] },
   async () => {
     const projects = await db.project.findMany({
       where: { repoOwner: { not: null }, repoName: { not: null } },
@@ -51,8 +50,7 @@ export const weeklyProjectScan = inngest.createFunction(
  * Runs on the 1st of each month.
  */
 export const monthlySpendSnapshot = inngest.createFunction(
-  { id: "monthly-spend-snapshot", name: "Monthly spend snapshot" },
-  { cron: "0 6 1 * *" }, // 1st of month, 6am UTC
+  { id: "monthly-spend-snapshot", name: "Monthly spend snapshot", triggers: [{ cron: "0 6 1 * *" }] },
   async () => {
     const monthYear = new Date().toISOString().slice(0, 7); // "2026-03"
     const plans = await db.vendorPlan.findMany({
