@@ -142,19 +142,33 @@ async function fetchStripe(key: string): Promise<BillingResult | null> {
       `https://api.stripe.com/v1/charges?limit=100&created[gte]=${startOfMonth}`,
       { headers: { Authorization: `Bearer ${key}` } }
     );
-    if (!chargesRes.ok) return null;
 
-    const chargesData = await chargesRes.json();
-    const charges = (chargesData.data ?? []).filter((c: { paid: boolean }) => c.paid);
-    const totalVolume = charges.reduce((sum: number, c: { amount: number }) => sum + c.amount, 0) / 100;
-    const estimatedFees = totalVolume * 0.029 + charges.length * 0.30;
+    if (chargesRes.ok) {
+      const chargesData = await chargesRes.json();
+      const charges = (chargesData.data ?? []).filter((c: { paid: boolean }) => c.paid);
+      const totalVolume = charges.reduce((sum: number, c: { amount: number }) => sum + c.amount, 0) / 100;
+      const estimatedFees = totalVolume * 0.029 + charges.length * 0.30;
+      return {
+        vendorId: "stripe",
+        planName: "Standard",
+        monthlySpendUsd: Math.round(estimatedFees * 100) / 100,
+        usageIncluded: Math.round(totalVolume),
+        unit: "$ volume processed",
+        source: "billing_api",
+      };
+    }
 
+    // Final fallback: just validate the key is real via /v1/account
+    const accountRes = await fetch("https://api.stripe.com/v1/account", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!accountRes.ok) return null;
+
+    // Key valid but no read permissions granted — show as connected at $0
     return {
       vendorId: "stripe",
       planName: "Standard",
-      monthlySpendUsd: Math.round(estimatedFees * 100) / 100,
-      usageIncluded: Math.round(totalVolume),
-      unit: "$ volume processed",
+      monthlySpendUsd: 0,
       source: "billing_api",
     };
   } catch {

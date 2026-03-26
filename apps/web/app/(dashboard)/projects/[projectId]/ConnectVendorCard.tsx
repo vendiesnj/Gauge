@@ -73,15 +73,16 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
       if (data.updated > 0) {
+        const spend = data.monthlySpendUsd ?? 0;
         update(vendor.id, {
           status: "done",
-          msg: `Connected — $${data.monthlySpendUsd?.toFixed(2) ?? "0"}/mo`,
+          msg: spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected",
           key: "",
           open: false,
         });
         router.refresh();
       } else {
-        update(vendor.id, { status: "error", msg: "Key valid but no spend data available (may need elevated permissions)" });
+        update(vendor.id, { status: "error", msg: "Invalid key or key rejected by vendor" });
       }
     } catch (err) {
       update(vendor.id, {
