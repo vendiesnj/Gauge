@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ScanHistoryList } from "./ScanHistoryList";
 
 export const metadata: Metadata = { title: "Scan history" };
 
@@ -48,55 +49,17 @@ export default async function ScanHistoryPage({
         <h1 className="heading-lg">Scan history</h1>
       </div>
 
-      {scans.length === 0 ? (
-        <div className="card">
-          <div className="empty-state">
-            <div className="muted small">No scans yet. Upload a scan from the VS Code extension.</div>
-          </div>
-        </div>
-      ) : (
-        <div className="stack gap-8">
-          {scans.map((scan) => (
-            <Link
-              key={scan.id}
-              href={`/scans/${scan.id}`}
-              className="card card-hover"
-              style={{ display: "block" }}
-            >
-              <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
-                <div className="row gap-8">
-                  <span style={{ fontWeight: 600 }}>
-                    {scan.scannedAt
-                      ? new Date(scan.scannedAt).toLocaleString()
-                      : new Date(scan.createdAt).toLocaleString()}
-                  </span>
-                  <span className={`badge ${
-                    scan.status === "COMPLETE" ? "badge-high" :
-                    scan.status === "FAILED" ? "badge-danger" : "badge-medium"
-                  }`}>{scan.status.toLowerCase()}</span>
-                </div>
-                <span className="muted small">{scan.triggeredBy}</span>
-              </div>
-
-              <div className="row gap-16 muted small" style={{ marginBottom: 8 }}>
-                <span>{scan._count.findings} vendor{scan._count.findings !== 1 ? "s" : ""}</span>
-                {scan.totalFilesScanned && <span>{scan.totalFilesScanned} files</span>}
-                {scan._count.unknownDomains > 0 && <span>{scan._count.unknownDomains} unknown domains</span>}
-              </div>
-
-              {scan.findings.length > 0 && (
-                <div className="row gap-4" style={{ flexWrap: "wrap" }}>
-                  {scan.findings.map((f) => (
-                    <span key={f.vendorId} className={`badge badge-${f.category}`} style={{ fontSize: 10.5 }}>
-                      {f.vendorName}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </Link>
-          ))}
-        </div>
-      )}
+      <ScanHistoryList projectId={projectId} scans={scans.map((scan) => ({
+        id: scan.id,
+        status: scan.status,
+        triggeredBy: scan.triggeredBy,
+        scannedAt: scan.scannedAt?.toISOString() ?? null,
+        createdAt: scan.createdAt.toISOString(),
+        totalFilesScanned: scan.totalFilesScanned,
+        findingCount: scan._count.findings,
+        unknownDomainCount: scan._count.unknownDomains,
+        findings: scan.findings,
+      }))} />
     </div>
   );
 }

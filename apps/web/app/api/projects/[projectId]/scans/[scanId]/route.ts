@@ -73,10 +73,15 @@ export async function DELETE(
   if (scan.status === "COMPLETE" || scan.status === "FAILED")
     return NextResponse.json({ error: "Scan already finished" }, { status: 400 });
 
-  await db.scan.update({
-    where: { id: scanId },
-    data: { status: "FAILED", notes: ["Cancelled by user"] },
-  });
+  // If pending/running, cancel it; otherwise delete it entirely
+  if (scan.status === "PENDING" || scan.status === "RUNNING") {
+    await db.scan.update({
+      where: { id: scanId },
+      data: { status: "FAILED", notes: ["Cancelled by user"] },
+    });
+  } else {
+    await db.scan.delete({ where: { id: scanId } });
+  }
 
   return NextResponse.json({ ok: true });
 }
