@@ -30,6 +30,9 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
   const [envStatus, setEnvStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [envMsg, setEnvMsg] = useState("");
   const envFileRef = useRef<HTMLInputElement>(null);
+  const [showVercel, setShowVercel] = useState(false);
+  const [vercelToken, setVercelToken] = useState("");
+  const [vercelProjectId, setVercelProjectId] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll scan status until terminal state
@@ -130,6 +133,33 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
     } catch {
       setEnvStatus("error");
       setEnvMsg("Failed to process .env file.");
+    }
+  }
+
+  async function handleVercelFetch(e: React.FormEvent) {
+    e.preventDefault();
+    setEnvStatus("loading");
+    setEnvMsg("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/billing/vercel`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ vercelToken, vercelProjectId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      if (data.updated > 0) {
+        setEnvMsg(`Updated billing for: ${data.vendors.join(", ")}`);
+        setEnvStatus("done");
+        setShowVercel(false);
+        router.refresh();
+      } else {
+        setEnvMsg("No matching vendor keys found in that Vercel project.");
+        setEnvStatus("error");
+      }
+    } catch (err) {
+      setEnvStatus("error");
+      setEnvMsg(err instanceof Error ? err.message : "Failed to fetch from Vercel.");
     }
   }
 
@@ -273,7 +303,7 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
           />
         </label>
 
-        {/* .env upload for billing accuracy */}
+        {/* .env / Vercel billing fetch */}
         <div
           style={{
             padding: "12px 14px",
@@ -286,30 +316,76 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
             </svg>
-            <span className="small" style={{ fontWeight: 500 }}>Upload .env for exact billing data</span>
+            <span className="small" style={{ fontWeight: 500 }}>Get exact billing data</span>
           </div>
           <p className="muted" style={{ fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
-            Most teams don&apos;t commit API keys to GitHub. Drop your <code>.env</code> here to fetch real spend from vendor billing APIs. Keys are used once and never stored.
+            Most teams don&apos;t commit API keys to GitHub. Upload your <code>.env</code> or pull directly from Vercel to fetch real spend. Keys are used once and never stored.
           </p>
-          <div className="row gap-8">
+
+          <div className="row gap-8" style={{ marginBottom: showVercel ? 12 : 0 }}>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => envFileRef.current?.click()}
               disabled={envStatus === "loading"}
             >
-              {envStatus === "loading" ? "Fetching billing…" : "Upload .env"}
+              {envStatus === "loading" && !showVercel ? "Fetching…" : "Upload .env"}
             </button>
-            {envStatus === "done" && (
-              <span className="small" style={{ color: "var(--good)" }}>{envMsg}</span>
-            )}
-            {envStatus === "error" && (
-              <span className="small" style={{ color: "var(--danger)" }}>{envMsg}</span>
-            )}
+            <button
+              className="btn btn-secondary btn-sm row gap-6"
+              onClick={() => setShowVercel(!showVercel)}
+              disabled={envStatus === "loading"}
+            >
+              {/* Vercel triangle logo */}
+              <svg width="11" height="11" viewBox="0 0 116 100" fill="currentColor">
+                <path d="M57.5 0L115 100H0L57.5 0z" />
+              </svg>
+              {showVercel ? "Cancel" : "Import from Vercel"}
+            </button>
           </div>
+
+          {showVercel && (
+            <form onSubmit={handleVercelFetch} className="stack gap-8" style={{ marginTop: 10 }}>
+              <input
+                className="input"
+                placeholder="Vercel API token"
+                type="password"
+                value={vercelToken}
+                onChange={(e) => setVercelToken(e.target.value)}
+                required
+                style={{ fontSize: 12 }}
+              />
+              <input
+                className="input"
+                placeholder="Vercel project name or ID"
+                value={vercelProjectId}
+                onChange={(e) => setVercelProjectId(e.target.value)}
+                required
+                style={{ fontSize: 12 }}
+              />
+              <p className="muted" style={{ fontSize: 10, lineHeight: 1.5 }}>
+                Create a token at vercel.com/account/tokens with &quot;Read&quot; scope. Your token is never stored.
+              </p>
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={envStatus === "loading"}
+              >
+                {envStatus === "loading" ? "Fetching from Vercel…" : "Fetch env vars"}
+              </button>
+            </form>
+          )}
+
+          {envStatus === "done" && (
+            <div className="small" style={{ color: "var(--good)", marginTop: 8 }}>{envMsg}</div>
+          )}
+          {envStatus === "error" && (
+            <div className="small" style={{ color: "var(--danger)", marginTop: 8 }}>{envMsg}</div>
+          )}
+
           <input
             ref={envFileRef}
             type="file"
-            accept=".env,.env.local,.env.production,text/*"
+            accept=".env,.env.local,.env.production,.env.development,text/*"
             style={{ display: "none" }}
             onChange={(e) => {
               const file = e.target.files?.[0];
