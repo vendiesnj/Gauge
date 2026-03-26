@@ -8,6 +8,7 @@ import { ScanTriggerCard } from "./ScanTriggerCard";
 import { ApiTokenCard } from "./ApiTokenCard";
 import { GlidepathSection } from "./GlidepathSection";
 import { RecalculateButton } from "./RecalculateButton";
+import { SpendTrendChart } from "./SpendTrendChart";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -161,6 +162,8 @@ export default async function ProjectDetailPage({
           </div>
         </div>
       </div>
+
+      <SpendTrendChart projectId={projectId} />
 
       <div className="grid-2" style={{ gap: 20 }}>
         {/* Left column */}
