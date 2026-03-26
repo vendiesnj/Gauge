@@ -116,12 +116,12 @@ async function fetchStripe(key: string): Promise<BillingResult | null> {
   try {
     const startOfMonth = Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000);
 
-    // Try balance_transactions first (requires Balance: Read)
+    // Try balance_transactions (requires Balance: Read)
     const balanceRes = await fetch(
       `https://api.stripe.com/v1/balance_transactions?type=charge&limit=100&created[gte]=${startOfMonth}`,
       { headers: { Authorization: `Bearer ${key}` } }
     );
-
+    if (balanceRes.status === 401) return null; // Key is invalid
     if (balanceRes.ok) {
       const data = await balanceRes.json();
       const totalVolume = (data.data ?? []).reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0) / 100;
@@ -137,12 +137,12 @@ async function fetchStripe(key: string): Promise<BillingResult | null> {
       };
     }
 
-    // Fallback: charges endpoint (requires Charges: Read only)
+    // Try charges endpoint (requires Charges: Read)
     const chargesRes = await fetch(
       `https://api.stripe.com/v1/charges?limit=100&created[gte]=${startOfMonth}`,
       { headers: { Authorization: `Bearer ${key}` } }
     );
-
+    if (chargesRes.status === 401) return null;
     if (chargesRes.ok) {
       const chargesData = await chargesRes.json();
       const charges = (chargesData.data ?? []).filter((c: { paid: boolean }) => c.paid);
@@ -158,13 +158,8 @@ async function fetchStripe(key: string): Promise<BillingResult | null> {
       };
     }
 
-    // Final fallback: just validate the key is real via /v1/account
-    const accountRes = await fetch("https://api.stripe.com/v1/account", {
-      headers: { Authorization: `Bearer ${key}` },
-    });
-    if (!accountRes.ok) return null;
-
-    // Key valid but no read permissions granted — show as connected at $0
+    // Key is real (got 403/other, not 401) but lacks read permissions on both endpoints.
+    // Still valid — show as connected at $0.
     return {
       vendorId: "stripe",
       planName: "Standard",
