@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.STRIPE_CLIENT_ID!,
-    scope: "read_only",
+    scope: "read_write",
     state,
     redirect_uri: `${process.env.NEXT_PUBLIC_URL}/api/connect/stripe/callback`,
   });
