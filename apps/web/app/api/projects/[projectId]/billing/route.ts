@@ -100,17 +100,21 @@ export async function POST(
 
       // Store encrypted key on VendorConnection so the daily refresh job can use it
       const rawKey = rawKeys.find((k) => k.vendorId === result.vendorId);
-      if (rawKey) {
-        await db.vendorConnection.upsert({
-          where: { orgId_vendorId: { orgId: project.orgId, vendorId: result.vendorId } },
-          update: { accessToken: "manual", encryptedAdminKey: encrypt(rawKey.value) },
-          create: {
-            orgId: project.orgId,
-            vendorId: result.vendorId,
-            accessToken: "manual",
-            encryptedAdminKey: encrypt(rawKey.value),
-          },
-        });
+      if (rawKey && process.env.ENCRYPTION_KEY) {
+        try {
+          await db.vendorConnection.upsert({
+            where: { orgId_vendorId: { orgId: project.orgId, vendorId: result.vendorId } },
+            update: { accessToken: "manual", encryptedAdminKey: encrypt(rawKey.value) },
+            create: {
+              orgId: project.orgId,
+              vendorId: result.vendorId,
+              accessToken: "manual",
+              encryptedAdminKey: encrypt(rawKey.value),
+            },
+          });
+        } catch {
+          // Encryption failed — billing still works, just won't auto-refresh
+        }
       }
     }
 

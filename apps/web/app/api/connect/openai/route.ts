@@ -57,14 +57,14 @@ export async function POST(req: NextRequest) {
     where: { orgId_vendorId: { orgId: project.orgId, vendorId: "openai" } },
     update: {
       accessToken: serviceAccountKey,
-      encryptedAdminKey: encrypt(adminKey),
+      encryptedAdminKey: process.env.ENCRYPTION_KEY ? encrypt(adminKey) : undefined,
       metadata: { openaiProjectId },
     },
     create: {
       orgId: project.orgId,
       vendorId: "openai",
       accessToken: serviceAccountKey,
-      encryptedAdminKey: encrypt(adminKey),
+      encryptedAdminKey: process.env.ENCRYPTION_KEY ? encrypt(adminKey) : null,
       metadata: { openaiProjectId },
     },
   });
