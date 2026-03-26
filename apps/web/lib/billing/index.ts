@@ -226,7 +226,8 @@ async function fetchSendGrid(key: string): Promise<BillingResult | null> {
       unit: "emails this month",
       source: "billing_api",
     };
-  } catch {
+  } catch (e) {
+    console.error("[billing/stripe] exception:", e);
     return null;
   }
 }
