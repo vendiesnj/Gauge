@@ -2,6 +2,7 @@ node_modules
 .next
 dist
 .vscode-test
+.env
 .env.local
 *.vsix
 coverage
