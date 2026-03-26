@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
+import { fetchVercelBilling } from "@/lib/billing";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -58,6 +59,15 @@ export async function GET(req: NextRequest) {
       metadata: teamId ? { teamId } : {},
     },
   });
+
+  const billing = await fetchVercelBilling(accessToken, teamId);
+  if (billing) {
+    await db.vendorPlan.upsert({
+      where: { projectId_vendorId: { projectId, vendorId: "vercel" } },
+      update: { planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
+      create: { projectId, vendorId: "vercel", planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
+    });
+  }
 
   return NextResponse.redirect(
     `${process.env.NEXT_PUBLIC_URL}/projects/${projectId}?connected=vercel`

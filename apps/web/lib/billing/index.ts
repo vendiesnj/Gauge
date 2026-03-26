@@ -14,7 +14,7 @@ export type BillingResult = {
 
 // ─── OpenAI ───────────────────────────────────────────────────────────────────
 // Uses the organization usage API (2024+) to get token counts, then estimates cost
-async function fetchOpenAI(key: string): Promise<BillingResult | null> {
+export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
   try {
     const now = new Date();
     const startOfMonth = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);

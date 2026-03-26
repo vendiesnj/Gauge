@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { fetchOpenAI } from "@/lib/billing";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -65,5 +66,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ connected: true });
+  // Use admin key (before it's discarded) to fetch usage data — service account keys lack usage.read
+  const billing = await fetchOpenAI(adminKey);
+  if (billing) {
+    await db.vendorPlan.upsert({
+      where: { projectId_vendorId: { projectId: gaugeProjectId, vendorId: "openai" } },
+      update: { planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
+      create: { projectId: gaugeProjectId, vendorId: "openai", planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
+    });
+  }
+
+  return NextResponse.json({ connected: true, monthlySpendUsd: billing?.monthlySpendUsd ?? 0 });
 }

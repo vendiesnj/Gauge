@@ -136,10 +136,11 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
+      const spend = data.monthlySpendUsd ?? 0;
       setOpenaiRow((prev) => ({
         ...prev,
         status: "done",
-        msg: "Connected",
+        msg: spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected",
         adminKey: "",
         openaiProjectId: "",
         open: false,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
+import { fetchStripeOAuth } from "@/lib/billing";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -56,6 +57,16 @@ export async function GET(req: NextRequest) {
       metadata: { stripeAccountId },
     },
   });
+
+  // Fetch and store billing data immediately after connecting
+  const billing = await fetchStripeOAuth(stripeAccountId);
+  if (billing) {
+    await db.vendorPlan.upsert({
+      where: { projectId_vendorId: { projectId, vendorId: "stripe" } },
+      update: { planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
+      create: { projectId, vendorId: "stripe", planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
+    });
+  }
 
   return NextResponse.redirect(
     `${process.env.NEXT_PUBLIC_URL}/projects/${projectId}?connected=stripe`
