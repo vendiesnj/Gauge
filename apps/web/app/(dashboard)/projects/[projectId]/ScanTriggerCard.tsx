@@ -219,12 +219,29 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
             borderRadius: 8,
             background: "var(--panel-2)",
             color: "var(--muted)",
+            justifyContent: "space-between",
           }}
         >
-          <Spinner />
-          {phase === "queuing"
-            ? "Queuing scan job…"
-            : "Scanning files in background — this takes a few seconds…"}
+          <span className="row gap-8">
+            <Spinner />
+            {phase === "queuing"
+              ? "Queuing scan job…"
+              : "Scanning files in background — this takes a few seconds…"}
+          </span>
+          {scanId && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ color: "var(--danger, #f87171)", flexShrink: 0 }}
+              onClick={async () => {
+                await fetch(`/api/projects/${projectId}/scans/${scanId}`, { method: "DELETE" });
+                clearInterval(pollRef.current!);
+                setPhase("error");
+                setErrorMsg("Scan cancelled.");
+              }}
+            >
+              Cancel
+            </button>
+          )}
         </div>
       )}
 
