@@ -13,6 +13,7 @@ export default auth((req) => {
     pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/inngest") ||  // inngest sync + webhooks
     pathname.startsWith("/api/scan") ||     // extension upload
     pathname.startsWith("/api/runtime") ||  // runtime ingest
     pathname.startsWith("/api/vendors")
