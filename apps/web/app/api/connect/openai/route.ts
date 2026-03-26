@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fetchOpenAI } from "@/lib/billing";
+import { encrypt } from "@/lib/crypto";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -56,12 +57,14 @@ export async function POST(req: NextRequest) {
     where: { orgId_vendorId: { orgId: project.orgId, vendorId: "openai" } },
     update: {
       accessToken: serviceAccountKey,
+      encryptedAdminKey: encrypt(adminKey),
       metadata: { openaiProjectId },
     },
     create: {
       orgId: project.orgId,
       vendorId: "openai",
       accessToken: serviceAccountKey,
+      encryptedAdminKey: encrypt(adminKey),
       metadata: { openaiProjectId },
     },
   });

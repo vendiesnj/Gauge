@@ -13,99 +13,128 @@ export type BillingResult = {
 };
 
 // ─── OpenAI ───────────────────────────────────────────────────────────────────
-// Uses the organization usage API (2024+) to get token counts, then estimates cost
+// Uses the organization costs API for actual dollar amounts (requires admin key with usage.read)
 export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
   try {
     const now = new Date();
     const startOfMonth = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
+    const headers = { Authorization: `Bearer ${key}` };
 
-    // Try the org usage endpoint (requires usage.read scope)
-    const usageRes = await fetch(
-      `https://api.openai.com/v1/organization/usage/completions?start_time=${startOfMonth}&limit=100`,
-      { headers: { Authorization: `Bearer ${key}` } }
+    // Try the costs API — returns actual USD amounts, not token counts
+    const costsRes = await fetch(
+      `https://api.openai.com/v1/organization/costs?start_time=${startOfMonth}&bucket_width=1d&limit=31`,
+      { headers }
     );
 
-    if (usageRes.ok) {
-      const data = await usageRes.json();
-      let totalInputTokens = 0;
-      let totalOutputTokens = 0;
-      for (const item of data.data ?? []) {
-        totalInputTokens += item.input_tokens ?? 0;
-        totalOutputTokens += item.output_tokens ?? 0;
+    if (costsRes.ok) {
+      const data = await costsRes.json();
+      let totalCost = 0;
+      for (const bucket of data.data ?? []) {
+        for (const result of bucket.results ?? []) {
+          totalCost += result.amount?.value ?? 0;
+        }
       }
-      const estimatedCost = (totalInputTokens / 1_000_000) * 0.15 + (totalOutputTokens / 1_000_000) * 0.60;
       return {
         vendorId: "openai",
         planName: "Pay-as-you-go",
-        monthlySpendUsd: Math.round(estimatedCost * 100) / 100,
+        monthlySpendUsd: Math.round(totalCost * 100) / 100,
         source: "billing_api",
       };
     }
 
-    // Fallback: verify the key is valid via models endpoint
-    const validRes = await fetch("https://api.openai.com/v1/models?limit=1", {
-      headers: { Authorization: `Bearer ${key}` },
-    });
+    // Costs API failed — fall back to usage API with per-model pricing
+    const usageRes = await fetch(
+      `https://api.openai.com/v1/organization/usage/completions?start_time=${startOfMonth}&limit=100`,
+      { headers }
+    );
+
+    if (usageRes.ok) {
+      const data = await usageRes.json();
+      // Per-model pricing ($/1M tokens) — input, output
+      const MODEL_PRICING: Record<string, [number, number]> = {
+        "gpt-4o":                [2.50,  10.00],
+        "gpt-4o-mini":           [0.15,   0.60],
+        "gpt-4-turbo":           [10.00, 30.00],
+        "gpt-4":                 [30.00, 60.00],
+        "o1":                    [15.00, 60.00],
+        "o1-mini":               [3.00,  12.00],
+        "o3-mini":               [1.10,   4.40],
+        "gpt-3.5-turbo":         [0.50,   1.50],
+      };
+      let totalCost = 0;
+      for (const item of data.data ?? []) {
+        const model: string = item.model ?? "";
+        const modelKey = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k)) ?? "gpt-4o";
+        const [inputRate, outputRate] = MODEL_PRICING[modelKey];
+        totalCost +=
+          ((item.input_tokens ?? 0) / 1_000_000) * inputRate +
+          ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
+      }
+      return {
+        vendorId: "openai",
+        planName: "Pay-as-you-go",
+        monthlySpendUsd: Math.round(totalCost * 100) / 100,
+        source: "billing_api",
+      };
+    }
+
+    // Key valid but no billing scope — return $0 so it shows as connected
+    const validRes = await fetch("https://api.openai.com/v1/models?limit=1", { headers });
     if (!validRes.ok) return null;
 
-    // Key is valid but no usage data available — return $0 so it shows as detected
-    return {
-      vendorId: "openai",
-      planName: "Pay-as-you-go",
-      monthlySpendUsd: 0,
-      source: "billing_api",
-    };
+    return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api" };
   } catch {
     return null;
   }
 }
 
 // ─── Anthropic ────────────────────────────────────────────────────────────────
-async function fetchAnthropic(key: string): Promise<BillingResult | null> {
+export async function fetchAnthropic(key: string): Promise<BillingResult | null> {
   try {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const anthropicHeaders = { "x-api-key": key, "anthropic-version": "2023-06-01" };
 
-    // Try usage API (requires admin key with usage:read scope)
+    // Per-model pricing ($/1M tokens) — input, output
+    const MODEL_PRICING: Record<string, [number, number]> = {
+      "claude-opus-4":          [15.00,  75.00],
+      "claude-sonnet-4":        [ 3.00,  15.00],
+      "claude-3-5-sonnet":      [ 3.00,  15.00],
+      "claude-3-5-haiku":       [ 0.80,   4.00],
+      "claude-3-opus":          [15.00,  75.00],
+      "claude-3-sonnet":        [ 3.00,  15.00],
+      "claude-3-haiku":         [ 0.25,   1.25],
+      "claude-2":               [ 8.00,  24.00],
+    };
+
     const usageRes = await fetch(
       `https://api.anthropic.com/v1/organizations/usage?start_date=${startOfMonth}`,
-      {
-        headers: {
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01",
-        },
-      }
+      { headers: anthropicHeaders }
     );
 
     if (usageRes.ok) {
       const data = await usageRes.json();
-      let totalInputTokens = 0;
-      let totalOutputTokens = 0;
+      let totalCost = 0;
       for (const item of data.data ?? []) {
-        totalInputTokens += item.input_tokens ?? 0;
-        totalOutputTokens += item.output_tokens ?? 0;
+        const model: string = item.model ?? "";
+        const modelKey = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k)) ?? "claude-3-5-sonnet";
+        const [inputRate, outputRate] = MODEL_PRICING[modelKey];
+        totalCost +=
+          ((item.input_tokens ?? 0) / 1_000_000) * inputRate +
+          ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
       }
-      const estimatedCost = (totalInputTokens / 1_000_000) * 3 + (totalOutputTokens / 1_000_000) * 15;
       return {
         vendorId: "anthropic",
         planName: "Pay-as-you-go",
-        monthlySpendUsd: Math.round(estimatedCost * 100) / 100,
+        monthlySpendUsd: Math.round(totalCost * 100) / 100,
         source: "billing_api",
       };
     }
 
-    // Fallback: verify key is valid
-    const validRes = await fetch("https://api.anthropic.com/v1/models", {
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
-    });
+    const validRes = await fetch("https://api.anthropic.com/v1/models", { headers: anthropicHeaders });
     if (!validRes.ok) return null;
 
-    return {
-      vendorId: "anthropic",
-      planName: "Pay-as-you-go",
-      monthlySpendUsd: 0,
-      source: "billing_api",
-    };
+    return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api" };
   } catch {
     return null;
   }
@@ -332,89 +361,21 @@ export async function fetchVercelBilling(
     const headers = { Authorization: `Bearer ${accessToken}` };
     const teamParam = teamId ? `?teamId=${teamId}` : "";
 
-    // 1. Try invoices — most reliable source of actual charges
-    const invoicesRes = await fetch(
-      `https://api.vercel.com/v2/payment/invoices${teamParam}`,
-      { headers }
-    );
-    console.log("[vercel billing] invoices status:", invoicesRes.status);
-    if (invoicesRes.ok) {
-      const invoicesData = await invoicesRes.json();
-      console.log("[vercel billing] invoices body:", JSON.stringify(invoicesData).slice(0, 500));
-      const invoices: Array<{ total: number; period?: { start: number; end: number }; state?: string }> =
-        invoicesData.invoices ?? invoicesData ?? [];
-      const latest = invoices.find((inv) => inv.state !== "draft") ?? invoices[0];
-      if (latest && latest.total > 0) {
-        return {
-          vendorId: "vercel",
-          planName: "Vercel Pro",
-          monthlySpendUsd: Math.round(latest.total * 100) / 100,
-          source: "billing_api",
-        };
-      }
-    } else {
-      const errBody = await invoicesRes.text();
-      console.log("[vercel billing] invoices error:", errBody.slice(0, 300));
-    }
-
-    // 2. Try /v2/billing — sometimes has period totals
-    const billingRes = await fetch(
-      `https://api.vercel.com/v2/billing${teamParam}`,
-      { headers }
-    );
-    console.log("[vercel billing] billing status:", billingRes.status);
-    if (billingRes.ok) {
-      const data = await billingRes.json();
-      console.log("[vercel billing] billing body:", JSON.stringify(data).slice(0, 500));
-      const spend =
-        data.billing?.period?.total ??
-        data.period?.total ??
-        data.total ??
-        0;
-      if (spend > 0) {
-        return {
-          vendorId: "vercel",
-          planName: "Vercel Pro",
-          monthlySpendUsd: Math.round(Number(spend) * 100) / 100,
-          source: "billing_api",
-        };
-      }
-    } else {
-      const errBody = await billingRes.text();
-      console.log("[vercel billing] billing error:", errBody.slice(0, 300));
-    }
-
-    // 3. Try v9 teams endpoint — has subscription/plan info
+    // Vercel's integration OAuth API doesn't expose invoice totals.
+    // Use v9 teams endpoint to get plan name at minimum.
     const v9Res = teamId
       ? await fetch(`https://api.vercel.com/v9/teams/${teamId}`, { headers })
-      : null;
-    console.log("[vercel billing] v9 team status:", v9Res?.status ?? "skipped");
-    if (v9Res?.ok) {
-      const v9Data = await v9Res.json();
-      console.log("[vercel billing] v9 team body:", JSON.stringify(v9Data));
-      const sub = v9Data.billing ?? v9Data.subscription ?? {};
-      const spend = sub.period?.total ?? sub.invoiceTotal ?? sub.amount ?? 0;
-      const planName = sub.plan ?? v9Data.plan ?? "Pro";
-      return {
-        vendorId: "vercel",
-        planName: `Vercel ${planName.charAt(0).toUpperCase() + planName.slice(1)}`,
-        monthlySpendUsd: Math.round(Number(spend) * 100) / 100,
-        source: "billing_api",
-      };
-    }
-
-    // 4. Fall back to v2 team/user info for plan name
-    const teamRes = teamId
-      ? await fetch(`https://api.vercel.com/v2/teams/${teamId}`, { headers })
       : await fetch("https://api.vercel.com/v2/user", { headers });
-    console.log("[vercel billing] team/user status:", teamRes.status);
-    if (teamRes.ok) {
-      const teamData = await teamRes.json();
-      console.log("[vercel billing] team/user FULL:", JSON.stringify(teamData));
-      const plan: string = teamData.plan ?? teamData.billing?.plan ?? "Pro";
+
+    if (v9Res.ok) {
+      const data = await v9Res.json();
+      const billing = data.billing ?? {};
+      const rawPlan: string = billing.planIteration ?? billing.plan ?? data.plan ?? "pro";
+      // planIteration "plus" = "Pro+", plain "pro" = "Pro", etc.
+      const planLabel = rawPlan === "plus" ? "Pro+" : rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1);
       return {
         vendorId: "vercel",
-        planName: `Vercel ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
+        planName: `Vercel ${planLabel}`,
         monthlySpendUsd: 0,
         source: "billing_api",
       };

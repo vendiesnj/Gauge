@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { fetchBillingForKeys } from "@/lib/billing";
+import { encrypt } from "@/lib/crypto";
 
 async function assertProjectAccess(userId: string, projectId: string) {
   const project = await db.project.findUnique({
@@ -96,6 +97,21 @@ export async function POST(
           source: "billing_api",
         },
       });
+
+      // Store encrypted key on VendorConnection so the daily refresh job can use it
+      const rawKey = rawKeys.find((k) => k.vendorId === result.vendorId);
+      if (rawKey) {
+        await db.vendorConnection.upsert({
+          where: { orgId_vendorId: { orgId: project.orgId, vendorId: result.vendorId } },
+          update: { accessToken: "manual", encryptedAdminKey: encrypt(rawKey.value) },
+          create: {
+            orgId: project.orgId,
+            vendorId: result.vendorId,
+            accessToken: "manual",
+            encryptedAdminKey: encrypt(rawKey.value),
+          },
+        });
+      }
     }
 
     const firstResult = billingResults[0];
