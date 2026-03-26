@@ -51,12 +51,14 @@ export async function POST(
   );
 
   if (!vercelRes.ok) {
-    const msg = await vercelRes.text().catch(() => vercelRes.statusText);
-    const status = vercelRes.status === 401 ? 401 : vercelRes.status === 404 ? 404 : 400;
-    return NextResponse.json(
-      { error: status === 401 ? "Invalid Vercel token" : status === 404 ? "Vercel project not found" : `Vercel API error: ${msg}` },
-      { status }
-    );
+    const s = vercelRes.status;
+    let error = "Vercel API error";
+    if (s === 401 || s === 403) {
+      error = "Invalid or insufficient Vercel token. Create a personal token at vercel.com/account/tokens with Full Account scope.";
+    } else if (s === 404) {
+      error = "Vercel project not found. Check the project name matches your Vercel dashboard exactly.";
+    }
+    return NextResponse.json({ error }, { status: 400 });
   }
 
   const vercelData = await vercelRes.json();
