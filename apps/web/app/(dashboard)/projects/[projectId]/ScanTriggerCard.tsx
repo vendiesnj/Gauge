@@ -30,9 +30,6 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
   const [envStatus, setEnvStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [envMsg, setEnvMsg] = useState("");
   const envFileRef = useRef<HTMLInputElement>(null);
-  const [showVercel, setShowVercel] = useState(false);
-  const [vercelToken, setVercelToken] = useState("");
-  const [vercelProjectId, setVercelProjectId] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll scan status until terminal state
@@ -130,38 +127,9 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
         setEnvMsg("No matching vendor API keys found in .env file.");
         setEnvStatus("error");
       }
-    } catch {
-      setEnvStatus("error");
-      setEnvMsg("Failed to process .env file.");
-    }
-  }
-
-  async function handleVercelFetch(e: React.FormEvent) {
-    e.preventDefault();
-    setEnvStatus("loading");
-    setEnvMsg("");
-    try {
-      const res = await fetch(`/api/projects/${projectId}/billing/vercel`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ vercelToken, vercelProjectId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
-      if (data.pullHint && data.vendors.length > 0) {
-        setEnvMsg(`Found ${data.vendors.join(", ")} keys in Vercel. Run the command below in your project, then upload the file.`);
-        setEnvStatus("done");
-      } else {
-        const count = data.totalEnvVars ?? 0;
-        setEnvMsg(count === 0
-          ? "No env vars found — check the project name matches your Vercel dashboard exactly."
-          : `Found ${count} env vars but none matched OpenAI, Anthropic, Stripe, Twilio, or SendGrid.`
-        );
-        setEnvStatus("error");
-      }
     } catch (err) {
       setEnvStatus("error");
-      setEnvMsg(err instanceof Error ? err.message : "Failed to fetch from Vercel.");
+      setEnvMsg(err instanceof Error ? err.message : "Failed to process .env file.");
     }
   }
 
@@ -305,7 +273,7 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
           />
         </label>
 
-        {/* .env / Vercel billing fetch */}
+        {/* .env upload for exact billing */}
         <div
           style={{
             padding: "12px 14px",
@@ -314,88 +282,31 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
             background: "var(--bg2)",
           }}
         >
-          <div className="row gap-8" style={{ marginBottom: 6 }}>
+          <div className="row gap-8" style={{ marginBottom: 4 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
             </svg>
-            <span className="small" style={{ fontWeight: 500 }}>Get exact billing data</span>
+            <span className="small" style={{ fontWeight: 500 }}>Upload .env for exact billing</span>
           </div>
-          <p className="muted" style={{ fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
-            Most teams don&apos;t commit API keys to GitHub. Upload your <code>.env</code> or pull directly from Vercel to fetch real spend. Keys are used once and never stored.
+          <p className="muted" style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 10 }}>
+            Most teams don&apos;t commit API keys. Upload any <code>.env</code> or <code>.env.local</code> to fetch real spend from vendor APIs — keys are used once and never stored.
+            {" "}<span style={{ opacity: 0.7 }}>On Vercel? Run <code>vercel env pull .env.local</code> first.</span>
           </p>
-
-          <div className="row gap-8" style={{ marginBottom: showVercel ? 12 : 0 }}>
+          <div className="row gap-8">
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => envFileRef.current?.click()}
               disabled={envStatus === "loading"}
             >
-              {envStatus === "loading" && !showVercel ? "Fetching…" : "Upload .env"}
+              {envStatus === "loading" ? "Fetching billing…" : "Upload .env"}
             </button>
-            <button
-              className="btn btn-secondary btn-sm row gap-6"
-              onClick={() => setShowVercel(!showVercel)}
-              disabled={envStatus === "loading"}
-            >
-              {/* Vercel triangle logo */}
-              <svg width="11" height="11" viewBox="0 0 116 100" fill="currentColor">
-                <path d="M57.5 0L115 100H0L57.5 0z" />
-              </svg>
-              {showVercel ? "Cancel" : "Import from Vercel"}
-            </button>
+            {envStatus === "done" && (
+              <span className="small" style={{ color: "var(--good)" }}>{envMsg}</span>
+            )}
+            {envStatus === "error" && (
+              <span className="small" style={{ color: "var(--danger)" }}>{envMsg}</span>
+            )}
           </div>
-
-          {showVercel && (
-            <form onSubmit={handleVercelFetch} className="stack gap-8" style={{ marginTop: 10 }}>
-              <input
-                className="input"
-                placeholder="Vercel API token"
-                type="password"
-                value={vercelToken}
-                onChange={(e) => setVercelToken(e.target.value)}
-                required
-                style={{ fontSize: 12 }}
-              />
-              <input
-                className="input"
-                placeholder="Vercel project name (e.g. my-app)"
-                value={vercelProjectId}
-                onChange={(e) => setVercelProjectId(e.target.value)}
-                required
-                style={{ fontSize: 12 }}
-              />
-              <p className="muted" style={{ fontSize: 10, lineHeight: 1.5 }}>
-                Create a token at vercel.com/account/tokens → Full Account scope. We&apos;ll detect which vendor keys you have, then show you how to pull them.
-              </p>
-              <button
-                type="submit"
-                className="btn btn-primary btn-sm"
-                disabled={envStatus === "loading"}
-              >
-                {envStatus === "loading" ? "Scanning Vercel…" : "Detect vendor keys"}
-              </button>
-            </form>
-          )}
-
-          {envStatus === "done" && envMsg.includes("Run the command") && (
-            <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 8, background: "var(--panel-2)", border: "1px solid var(--border)" }}>
-              <p className="muted small" style={{ marginBottom: 6 }}>{envMsg}</p>
-              <code style={{ fontSize: 11, display: "block", padding: "6px 10px", background: "var(--bg)", borderRadius: 6, marginBottom: 8 }}>
-                vercel env pull .env.local
-              </code>
-              <p className="muted" style={{ fontSize: 10 }}>
-                Then upload the <code>.env.local</code> file using the &quot;Upload .env&quot; button above.
-              </p>
-            </div>
-          )}
-
-          {envStatus === "done" && (
-            <div className="small" style={{ color: "var(--good)", marginTop: 8 }}>{envMsg}</div>
-          )}
-          {envStatus === "error" && (
-            <div className="small" style={{ color: "var(--danger)", marginTop: 8 }}>{envMsg}</div>
-          )}
-
           <input
             ref={envFileRef}
             type="file"
