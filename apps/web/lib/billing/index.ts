@@ -384,15 +384,34 @@ export async function fetchVercelBilling(
       console.log("[vercel billing] billing error:", errBody.slice(0, 300));
     }
 
-    // 3. Fall back to plan name from team/user info
+    // 3. Try v9 teams endpoint — has subscription/plan info
+    const v9Res = teamId
+      ? await fetch(`https://api.vercel.com/v9/teams/${teamId}`, { headers })
+      : null;
+    console.log("[vercel billing] v9 team status:", v9Res?.status ?? "skipped");
+    if (v9Res?.ok) {
+      const v9Data = await v9Res.json();
+      console.log("[vercel billing] v9 team body:", JSON.stringify(v9Data));
+      const sub = v9Data.billing ?? v9Data.subscription ?? {};
+      const spend = sub.period?.total ?? sub.invoiceTotal ?? sub.amount ?? 0;
+      const planName = sub.plan ?? v9Data.plan ?? "Pro";
+      return {
+        vendorId: "vercel",
+        planName: `Vercel ${planName.charAt(0).toUpperCase() + planName.slice(1)}`,
+        monthlySpendUsd: Math.round(Number(spend) * 100) / 100,
+        source: "billing_api",
+      };
+    }
+
+    // 4. Fall back to v2 team/user info for plan name
     const teamRes = teamId
       ? await fetch(`https://api.vercel.com/v2/teams/${teamId}`, { headers })
       : await fetch("https://api.vercel.com/v2/user", { headers });
     console.log("[vercel billing] team/user status:", teamRes.status);
     if (teamRes.ok) {
       const teamData = await teamRes.json();
-      console.log("[vercel billing] team/user body:", JSON.stringify(teamData).slice(0, 300));
-      const plan: string = teamData.plan ?? teamData.user?.defaultTeamId ?? "pro";
+      console.log("[vercel billing] team/user FULL:", JSON.stringify(teamData));
+      const plan: string = teamData.plan ?? teamData.billing?.plan ?? "Pro";
       return {
         vendorId: "vercel",
         planName: `Vercel ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
