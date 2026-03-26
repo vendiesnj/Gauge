@@ -32,7 +32,10 @@ interface OpenAIRowState {
   open: boolean;
 }
 
-export function ConnectVendorCard({ projectId }: { projectId: string }) {
+export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId: string; detectedVendorIds: string[] }) {
+  const allKnown = [...OAUTH_VENDORS.map(v => v.id), "openai", ...MANUAL_VENDORS.map(v => v.id)];
+  const relevant = detectedVendorIds.filter(id => allKnown.includes(id));
+  const showAll = relevant.length === 0; // fallback: show all if no scans yet
   const router = useRouter();
   const searchParams = useSearchParams();
   const connectedParam = searchParams.get("connected");
@@ -181,7 +184,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
           One-click connect
         </p>
         <div className="stack gap-8">
-          {OAUTH_VENDORS.map((vendor) => {
+          {OAUTH_VENDORS.filter(v => showAll || relevant.includes(v.id)).map((vendor) => {
             const isConnected = connected.includes(vendor.id);
             return (
               <div
@@ -237,7 +240,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
         </div>
         <div className="stack gap-8">
           {/* OpenAI — special two-input flow */}
-          {(() => {
+          {(showAll || relevant.includes("openai")) && (() => {
             const isConnected = connected.includes("openai") || openaiRow.status === "done";
             return (
               <div
@@ -326,7 +329,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
           })()}
 
           {/* Other manual vendors */}
-          {MANUAL_VENDORS.map((vendor) => {
+          {MANUAL_VENDORS.filter(v => showAll || relevant.includes(v.id)).map((vendor) => {
             const row = manualRows[vendor.id];
             return (
               <div

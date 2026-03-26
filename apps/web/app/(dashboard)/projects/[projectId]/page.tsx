@@ -340,7 +340,7 @@ export default async function ProjectDetailPage({
             repoOwner={project.repoOwner}
             repoName={project.repoName}
           />
-          <ConnectVendorCard projectId={projectId} />
+          <ConnectVendorCard projectId={projectId} detectedVendorIds={detectedVendors.map(v => v.vendorId)} />
           <AddPlanForm projectId={projectId} existingPlans={project.vendorPlans.map((p) => p.vendorId)} />
           <ApiTokenCard projectId={projectId} tokens={project.apiTokens.map((t) => ({ id: t.id, name: t.name, token: t.token, createdAt: t.createdAt.toISOString() }))} />
 
