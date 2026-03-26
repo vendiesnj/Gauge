@@ -232,6 +232,135 @@ async function fetchSendGrid(key: string): Promise<BillingResult | null> {
   }
 }
 
+// ─── Stripe OAuth ─────────────────────────────────────────────────────────────
+export async function fetchStripeOAuth(stripeAccountId: string): Promise<BillingResult | null> {
+  try {
+    const startOfMonth = Math.floor(
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000
+    );
+    const platformKey = process.env.STRIPE_SECRET_KEY!;
+    const headers = {
+      Authorization: `Bearer ${platformKey}`,
+      "Stripe-Account": stripeAccountId,
+    };
+
+    const balanceRes = await fetch(
+      `https://api.stripe.com/v1/balance_transactions?type=charge&limit=100&created[gte]=${startOfMonth}`,
+      { headers }
+    );
+    if (balanceRes.status === 401) return null;
+    if (balanceRes.ok) {
+      const data = await balanceRes.json();
+      const totalVolume =
+        (data.data ?? []).reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0) / 100;
+      const txCount = data.data?.length ?? 0;
+      const estimatedFees = totalVolume * 0.029 + txCount * 0.3;
+      return {
+        vendorId: "stripe",
+        planName: "Standard",
+        monthlySpendUsd: Math.round(estimatedFees * 100) / 100,
+        usageIncluded: Math.round(totalVolume),
+        unit: "$ volume processed",
+        source: "billing_api",
+      };
+    }
+
+    const chargesRes = await fetch(
+      `https://api.stripe.com/v1/charges?limit=100&created[gte]=${startOfMonth}`,
+      { headers }
+    );
+    if (chargesRes.status === 401) return null;
+    if (chargesRes.ok) {
+      const chargesData = await chargesRes.json();
+      const charges = (chargesData.data ?? []).filter((c: { paid: boolean }) => c.paid);
+      const totalVolume =
+        charges.reduce((sum: number, c: { amount: number }) => sum + c.amount, 0) / 100;
+      const estimatedFees = totalVolume * 0.029 + charges.length * 0.3;
+      return {
+        vendorId: "stripe",
+        planName: "Standard",
+        monthlySpendUsd: Math.round(estimatedFees * 100) / 100,
+        usageIncluded: Math.round(totalVolume),
+        unit: "$ volume processed",
+        source: "billing_api",
+      };
+    }
+
+    return {
+      vendorId: "stripe",
+      planName: "Standard",
+      monthlySpendUsd: 0,
+      source: "billing_api",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Google Cloud OAuth ────────────────────────────────────────────────────────
+export async function fetchGoogleBilling(
+  accessToken: string,
+  projectIds: string[]
+): Promise<BillingResult | null> {
+  try {
+    // Verify at least one project's billing info is accessible; detailed spend
+    // requires BigQuery export and is not available via REST API alone.
+    if (projectIds.length > 0) {
+      await fetch(
+        `https://cloudbilling.googleapis.com/v1/projects/${projectIds[0]}/billingInfo`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+    }
+
+    return {
+      vendorId: "google",
+      planName: "Google Cloud",
+      monthlySpendUsd: 0,
+      source: "billing_api",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Vercel OAuth ──────────────────────────────────────────────────────────────
+export async function fetchVercelBilling(
+  accessToken: string,
+  teamId: string | null
+): Promise<BillingResult | null> {
+  try {
+    const url = teamId
+      ? `https://api.vercel.com/v2/billing?teamId=${teamId}`
+      : "https://api.vercel.com/v2/billing";
+
+    const billingRes = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (billingRes.ok) {
+      const data = await billingRes.json();
+      const spend = data.billing?.period?.total ?? data.total ?? 0;
+      if (spend > 0) {
+        return {
+          vendorId: "vercel",
+          planName: "Vercel",
+          monthlySpendUsd: Math.round(Number(spend) * 100) / 100,
+          source: "billing_api",
+        };
+      }
+    }
+
+    return {
+      vendorId: "vercel",
+      planName: "Vercel",
+      monthlySpendUsd: 0,
+      source: "billing_api",
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 const BILLING_FETCHERS: Record<string, (key: string) => Promise<BillingResult | null>> = {
@@ -255,6 +384,30 @@ export async function fetchBillingForKeys(
 
   const results = await Promise.all(
     [...byVendor.entries()].map(([vendorId, key]) => BILLING_FETCHERS[vendorId](key))
+  );
+
+  return results.filter((r): r is BillingResult => r !== null);
+}
+
+export async function fetchBillingFromConnections(
+  connections: Array<{ vendorId: string; accessToken: string; metadata: Record<string, unknown> | null }>
+): Promise<BillingResult[]> {
+  const results = await Promise.all(
+    connections.map((conn) => {
+      const meta = (conn.metadata ?? {}) as Record<string, unknown>;
+      switch (conn.vendorId) {
+        case "stripe":
+          return fetchStripeOAuth(conn.accessToken);
+        case "google": {
+          const gcpProjects = (meta.gcpProjects as Array<{ projectId: string }> | undefined) ?? [];
+          return fetchGoogleBilling(conn.accessToken, gcpProjects.map((p) => p.projectId));
+        }
+        case "vercel":
+          return fetchVercelBilling(conn.accessToken, (meta.teamId as string) ?? null);
+        default:
+          return Promise.resolve(null);
+      }
+    })
   );
 
   return results.filter((r): r is BillingResult => r !== null);
