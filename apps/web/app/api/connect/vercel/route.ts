@@ -31,6 +31,6 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.redirect(
-    `https://vercel.com/oauth/authorize?${params.toString()}`
+    `https://vercel.com/integrations/${process.env.VERCEL_INTEGRATION_SLUG}/new?${params.toString()}`
   );
 }
