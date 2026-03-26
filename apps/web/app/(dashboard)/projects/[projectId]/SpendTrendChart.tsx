@@ -38,7 +38,7 @@ export function SpendTrendChart({ projectId }: Props) {
           <YAxis tickFormatter={v => `$${v}`} tick={{ fill: "var(--muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} width={48} />
           <Tooltip
             contentStyle={{ background: "var(--panel-2)", border: "1px solid var(--border-strong)", borderRadius: 10, fontSize: 12 }}
-            formatter={(v: number) => [`$${v}`, "Total spend"]}
+            formatter={(v) => [`$${v}`, "Total spend"]}
           />
           <Line type="monotone" dataKey="total" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3 }} />
         </LineChart>
