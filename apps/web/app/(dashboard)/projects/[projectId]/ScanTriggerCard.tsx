@@ -112,7 +112,7 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
     setEnvMsg("");
     try {
       const text = await file.text();
-      const res = await fetch(`/api/projects/${projectId}/billing/recalculate`, {
+      const res = await fetch(`/api/projects/${projectId}/billing`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ envContent: text }),

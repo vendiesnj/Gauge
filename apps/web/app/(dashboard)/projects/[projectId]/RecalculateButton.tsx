@@ -10,7 +10,7 @@ export function RecalculateButton({ projectId }: { projectId: string }) {
   async function recalculate() {
     setLoading(true);
     try {
-      await fetch(`/api/projects/${projectId}/billing/recalculate`, { method: "POST" });
+      await fetch(`/api/projects/${projectId}/billing`, { method: "POST" });
     } finally {
       setLoading(false);
       router.refresh();
