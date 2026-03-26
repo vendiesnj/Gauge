@@ -3,6 +3,5 @@ node_modules
 dist
 .vscode-test
 .env.local
-pnpm-lock.yaml
 *.vsix
 coverage
