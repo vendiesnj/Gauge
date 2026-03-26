@@ -44,9 +44,9 @@ export async function POST(
   if (!vercelToken || !vercelProjectId)
     return NextResponse.json({ error: "vercelToken and vercelProjectId are required" }, { status: 400 });
 
-  // Fetch env vars from Vercel API — decrypt=1 returns plaintext values
+  // Fetch env var names from Vercel (no decrypt — personal tokens can't decrypt values)
   const vercelRes = await fetch(
-    `https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProjectId)}/env?decrypt=true`,
+    `https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProjectId)}/env`,
     { headers: { Authorization: `Bearer ${vercelToken}` } }
   );
 
@@ -54,56 +54,33 @@ export async function POST(
     const s = vercelRes.status;
     let error = "Vercel API error";
     if (s === 401 || s === 403) {
-      error = "Invalid or insufficient Vercel token. Create a personal token at vercel.com/account/tokens with Full Account scope.";
+      error = "Invalid Vercel token. Go to vercel.com/account/tokens and create a new one with Full Account scope.";
     } else if (s === 404) {
-      error = "Vercel project not found. Check the project name matches your Vercel dashboard exactly.";
+      error = "Vercel project not found. Use the exact project name from your Vercel dashboard URL.";
     }
     return NextResponse.json({ error }, { status: 400 });
   }
 
   const vercelData = await vercelRes.json();
-  const envVars: Array<{ key: string; value: string }> = (vercelData.envs ?? [])
-    .filter((e: { type: string; value?: string }) => e.type !== "system" && e.value)
-    .map((e: { key: string; value: string }) => ({ key: e.key, value: e.value }));
+  const envKeys: string[] = (vercelData.envs ?? [])
+    .filter((e: { type: string }) => e.type !== "system")
+    .map((e: { key: string }) => e.key);
 
-  // Match env var names to vendor IDs
-  const rawKeys: Array<{ vendorId: string; value: string }> = [];
-  for (const { key, value } of envVars) {
+  // Match env var NAMES to vendor IDs (no values needed)
+  const detectedVendors: string[] = [];
+  for (const key of envKeys) {
     for (const { re, vendorId } of ENV_VENDOR_PATTERNS) {
-      if (re.test(key) && value.length > 8) {
-        rawKeys.push({ vendorId, value });
-        break;
+      if (re.test(key) && !detectedVendors.includes(vendorId)) {
+        detectedVendors.push(vendorId);
       }
     }
   }
 
-  if (rawKeys.length === 0) {
-    return NextResponse.json({ updated: 0, vendors: [] });
-  }
-
-  // Fetch real billing data
-  const billingResults = await fetchBillingForKeys(rawKeys);
-
-  for (const result of billingResults) {
-    await db.vendorPlan.upsert({
-      where: { projectId_vendorId: { projectId, vendorId: result.vendorId } },
-      update: {
-        planName: result.planName,
-        monthlySpendUsd: result.monthlySpendUsd,
-        source: "billing_api",
-      },
-      create: {
-        projectId,
-        vendorId: result.vendorId,
-        planName: result.planName,
-        monthlySpendUsd: result.monthlySpendUsd,
-        source: "billing_api",
-      },
-    });
-  }
-
+  // Return detected vendor names and instructions to pull values locally
   return NextResponse.json({
-    updated: billingResults.length,
-    vendors: billingResults.map((r) => r.vendorId),
+    updated: 0,
+    vendors: detectedVendors,
+    pullHint: detectedVendors.length > 0,
+    totalEnvVars: envKeys.length, // helpful for debugging
   });
 }
