@@ -9,6 +9,7 @@ import { ApiTokenCard } from "./ApiTokenCard";
 import { GlidepathSection } from "./GlidepathSection";
 import { RecalculateButton } from "./RecalculateButton";
 import { SpendTrendChart } from "./SpendTrendChart";
+import { ConnectVendorCard } from "./ConnectVendorCard";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -339,6 +340,7 @@ export default async function ProjectDetailPage({
             repoOwner={project.repoOwner}
             repoName={project.repoName}
           />
+          <ConnectVendorCard projectId={projectId} />
           <AddPlanForm projectId={projectId} existingPlans={project.vendorPlans.map((p) => p.vendorId)} />
           <ApiTokenCard projectId={projectId} tokens={project.apiTokens.map((t) => ({ id: t.id, name: t.name, token: t.token, createdAt: t.createdAt.toISOString() }))} />
 

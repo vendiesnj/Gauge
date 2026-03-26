@@ -57,9 +57,13 @@ export async function POST(
 
   let rawKeys: Array<{ vendorId: string; value: string }> = [];
 
-  // If env content provided, parse and match to vendors
   const body = await req.json().catch(() => ({}));
-  if (body.envContent && typeof body.envContent === "string") {
+
+  // Direct vendor key connection: { vendorId, apiKey }
+  if (body.vendorId && body.apiKey && typeof body.apiKey === "string" && body.apiKey.length > 8) {
+    rawKeys = [{ vendorId: body.vendorId, value: body.apiKey }];
+  } else if (body.envContent && typeof body.envContent === "string") {
+    // .env file upload: parse key=value pairs and match to vendors
     const pairs = parseEnvContent(body.envContent);
     for (const { key, value } of pairs) {
       for (const { re, vendorId } of ENV_VENDOR_PATTERNS) {
@@ -93,9 +97,14 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ updated: billingResults.length, vendors: billingResults.map((r) => r.vendorId) });
+    const firstResult = billingResults[0];
+    return NextResponse.json({
+      updated: billingResults.length,
+      vendors: billingResults.map((r) => r.vendorId),
+      monthlySpendUsd: firstResult?.monthlySpendUsd,
+    });
   }
 
-  // No env content — just a recalculate signal (client will router.refresh())
+  // No keys — just a recalculate signal (client will router.refresh())
   return NextResponse.json({ updated: 0 });
 }
