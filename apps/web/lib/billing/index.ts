@@ -337,11 +337,12 @@ export async function fetchVercelBilling(
       `https://api.vercel.com/v2/payment/invoices${teamParam}`,
       { headers }
     );
+    console.log("[vercel billing] invoices status:", invoicesRes.status);
     if (invoicesRes.ok) {
       const invoicesData = await invoicesRes.json();
+      console.log("[vercel billing] invoices body:", JSON.stringify(invoicesData).slice(0, 500));
       const invoices: Array<{ total: number; period?: { start: number; end: number }; state?: string }> =
         invoicesData.invoices ?? invoicesData ?? [];
-      // Most recent invoice first; take first paid/issued one
       const latest = invoices.find((inv) => inv.state !== "draft") ?? invoices[0];
       if (latest && latest.total > 0) {
         return {
@@ -351,6 +352,9 @@ export async function fetchVercelBilling(
           source: "billing_api",
         };
       }
+    } else {
+      const errBody = await invoicesRes.text();
+      console.log("[vercel billing] invoices error:", errBody.slice(0, 300));
     }
 
     // 2. Try /v2/billing — sometimes has period totals
@@ -358,9 +362,10 @@ export async function fetchVercelBilling(
       `https://api.vercel.com/v2/billing${teamParam}`,
       { headers }
     );
+    console.log("[vercel billing] billing status:", billingRes.status);
     if (billingRes.ok) {
       const data = await billingRes.json();
-      // Various shapes Vercel has returned over time
+      console.log("[vercel billing] billing body:", JSON.stringify(data).slice(0, 500));
       const spend =
         data.billing?.period?.total ??
         data.period?.total ??
@@ -374,14 +379,19 @@ export async function fetchVercelBilling(
           source: "billing_api",
         };
       }
+    } else {
+      const errBody = await billingRes.text();
+      console.log("[vercel billing] billing error:", errBody.slice(0, 300));
     }
 
     // 3. Fall back to plan name from team/user info
     const teamRes = teamId
       ? await fetch(`https://api.vercel.com/v2/teams/${teamId}`, { headers })
       : await fetch("https://api.vercel.com/v2/user", { headers });
+    console.log("[vercel billing] team/user status:", teamRes.status);
     if (teamRes.ok) {
       const teamData = await teamRes.json();
+      console.log("[vercel billing] team/user body:", JSON.stringify(teamData).slice(0, 300));
       const plan: string = teamData.plan ?? teamData.user?.defaultTeamId ?? "pro";
       return {
         vendorId: "vercel",
