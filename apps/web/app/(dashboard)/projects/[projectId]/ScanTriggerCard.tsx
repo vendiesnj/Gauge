@@ -385,7 +385,6 @@ export function ScanTriggerCard({ projectId, repoOwner, repoName }: Props) {
           <input
             ref={envFileRef}
             type="file"
-            accept=".env,.env.local,.env.production,.env.development,text/*"
             style={{ display: "none" }}
             onChange={(e) => {
               const file = e.target.files?.[0];
