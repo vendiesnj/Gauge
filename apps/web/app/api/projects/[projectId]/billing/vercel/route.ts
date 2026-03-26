@@ -46,7 +46,7 @@ export async function POST(
 
   // Fetch env vars from Vercel API — decrypt=1 returns plaintext values
   const vercelRes = await fetch(
-    `https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProjectId)}/env?decrypt=1`,
+    `https://api.vercel.com/v9/projects/${encodeURIComponent(vercelProjectId)}/env?decrypt=true`,
     { headers: { Authorization: `Bearer ${vercelToken}` } }
   );
 
