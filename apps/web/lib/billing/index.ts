@@ -116,17 +116,38 @@ async function fetchStripe(key: string): Promise<BillingResult | null> {
   try {
     const startOfMonth = Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000);
 
-    const res = await fetch(
+    // Try balance_transactions first (requires Balance: Read)
+    const balanceRes = await fetch(
       `https://api.stripe.com/v1/balance_transactions?type=charge&limit=100&created[gte]=${startOfMonth}`,
       { headers: { Authorization: `Bearer ${key}` } }
     );
-    if (!res.ok) return null;
-    const data = await res.json();
 
-    const totalVolume = (data.data ?? []).reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0) / 100;
-    // Stripe standard rate: 2.9% + $0.30 per transaction
-    const txCount = data.data?.length ?? 0;
-    const estimatedFees = totalVolume * 0.029 + txCount * 0.30;
+    if (balanceRes.ok) {
+      const data = await balanceRes.json();
+      const totalVolume = (data.data ?? []).reduce((sum: number, tx: { amount: number }) => sum + tx.amount, 0) / 100;
+      const txCount = data.data?.length ?? 0;
+      const estimatedFees = totalVolume * 0.029 + txCount * 0.30;
+      return {
+        vendorId: "stripe",
+        planName: "Standard",
+        monthlySpendUsd: Math.round(estimatedFees * 100) / 100,
+        usageIncluded: Math.round(totalVolume),
+        unit: "$ volume processed",
+        source: "billing_api",
+      };
+    }
+
+    // Fallback: charges endpoint (requires Charges: Read only)
+    const chargesRes = await fetch(
+      `https://api.stripe.com/v1/charges?limit=100&created[gte]=${startOfMonth}`,
+      { headers: { Authorization: `Bearer ${key}` } }
+    );
+    if (!chargesRes.ok) return null;
+
+    const chargesData = await chargesRes.json();
+    const charges = (chargesData.data ?? []).filter((c: { paid: boolean }) => c.paid);
+    const totalVolume = charges.reduce((sum: number, c: { amount: number }) => sum + c.amount, 0) / 100;
+    const estimatedFees = totalVolume * 0.029 + charges.length * 0.30;
 
     return {
       vendorId: "stripe",

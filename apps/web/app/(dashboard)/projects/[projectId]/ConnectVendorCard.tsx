@@ -17,7 +17,7 @@ const VENDORS: VendorConfig[] = [
     id: "stripe",
     name: "Stripe",
     placeholder: "rk_live_…",
-    hint: "Create a restricted key with Balance + Charges read access",
+    hint: "Create a restricted key with Charges: Read (Balance: Read optional for more detail)",
     docsUrl: "https://dashboard.stripe.com/apikeys",
     prefix: "rk_",
   },
