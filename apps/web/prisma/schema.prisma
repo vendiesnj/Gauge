@@ -1,0 +1,257 @@
+// Gauge – API Spend Platform
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth (NextAuth v5 / @auth/prisma-adapter) ────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships OrgMembership[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Multi-tenancy ────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships OrgMembership[]
+  projects    Project[]
+}
+
+model OrgMembership {
+  id     String  @id @default(cuid())
+  userId String
+  orgId  String
+  role   OrgRole @default(MEMBER)
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
+model Project {
+  id          String   @id @default(cuid())
+  orgId       String
+  name        String
+  slug        String
+  description String?
+  repoUrl     String?
+  repoOwner   String?
+  repoName    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  scans       Scan[]
+  usageEvents UsageEvent[]
+  vendorPlans VendorPlan[]
+  apiTokens   ApiToken[]
+
+  @@unique([orgId, slug])
+}
+
+// ─── Scans ────────────────────────────────────────────────────────────────────
+
+model Scan {
+  id                String     @id @default(cuid())
+  projectId         String
+  triggeredBy       String     // "github" | "upload" | "extension" | "api"
+  status            ScanStatus @default(PENDING)
+  scannedAt         DateTime?
+  totalFilesScanned Int?
+  notes             String[]
+  zipPayload        String?    @db.Text  // base64-encoded zip, cleared after scan
+  createdAt         DateTime   @default(now())
+
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  findings       ScanFinding[]
+  unknownDomains UnknownDomain[]
+}
+
+enum ScanStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+model ScanFinding {
+  id              String   @id @default(cuid())
+  scanId          String
+  vendorId        String
+  vendorName      String
+  category        String
+  pricingModel    String
+  confidence      String   // "low" | "medium" | "high"
+  evidences       Json     // DetectionEvidence[]
+  detectedApiKeys Json     // { pattern, filePath, line, redactedValue }[]
+  alternatives    Json     // VendorAlternative[]
+  createdAt       DateTime @default(now())
+
+  scan Scan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+}
+
+model UnknownDomain {
+  id       String @id @default(cuid())
+  scanId   String
+  domain   String
+  filePath String
+  line     Int
+
+  scan Scan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+}
+
+// ─── Vendor Plans & Usage ─────────────────────────────────────────────────────
+
+model VendorPlan {
+  id               String   @id @default(cuid())
+  projectId        String
+  vendorId         String
+  planName         String
+  monthlySpendUsd  Float?
+  monthlyCommitUsd Float?
+  usageIncluded    Float?
+  unit             String?
+  source           String   @default("manual") // "manual" | "billing_api" | "invoice"
+  billingPeriodStart DateTime?
+  billingPeriodEnd   DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, vendorId])
+}
+
+model UsageEvent {
+  id            String   @id @default(cuid())
+  projectId     String
+  vendorId      String
+  timestamp     DateTime
+  environment   String   @default("unknown")
+  service       String   @default("unknown")
+  endpoint      String?
+  usageQuantity Float
+  unit          String   @default("requests")
+  costUsd       Float?
+  createdAt     DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, vendorId])
+  @@index([projectId, timestamp])
+}
+
+// ─── API Tokens (for extension / runtime ingest) ─────────────────────────────
+
+model ApiToken {
+  id        String    @id @default(cuid())
+  projectId String
+  name      String
+  token     String    @unique
+  createdAt DateTime  @default(now())
+  lastUsed  DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ─── Vendor Pricing Tiers (seeded static data, updated periodically) ──────────
+// Drives glidepath charts, free tier detection, and upgrade recommendations.
+
+model VendorPricingTier {
+  id               String   @id @default(cuid())
+  vendorId         String   // matches VENDORS catalog id
+
+  tierName         String   // "Free", "Starter", "Pro", "Enterprise", or model name
+  tierOrder        Int      // 0 = cheapest/free, ascending
+
+  // Base cost
+  monthlyBaseUsd   Float    @default(0)
+
+  // Usage axis
+  usageUnit        String   // internal key: "emails", "mau", "tokens_1m", "sms", "requests_1k", "events_1k", "hosts", "gb_storage"
+  usageUnitLabel   String   // display label: "emails/mo", "MAU", "1M tokens", etc.
+  includedUnits    Float    @default(0)   // units bundled in monthly base (0 = pay-per-use)
+  pricePerUnit     Float?                 // cost per 1 unitBatchSize above included
+  unitBatchSize    Float    @default(1)   // e.g. 1000 means price is per-1k
+
+  // Caps & flags
+  maxUnits         Float?                 // null = unlimited
+  isFreeTier       Boolean  @default(false)
+  isMostPopular    Boolean  @default(false)
+
+  // Percentage-based pricing (payment processors)
+  percentageRate   Float?   // e.g. 0.029 for 2.9%
+  perTxFeeUsd      Float?   // e.g. 0.30
+
+  notes            String?
+  sourceUrl        String?
+  lastVerifiedAt   DateTime @default(now())
+
+  @@unique([vendorId, tierName])
+  @@index([vendorId, tierOrder])
+}

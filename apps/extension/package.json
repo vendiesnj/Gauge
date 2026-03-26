@@ -1,0 +1,54 @@
+{
+  "name": "api-spend-scout-pro-extension",
+  "displayName": "API Spend Scout Pro",
+  "description": "Scan code for external API vendors, redacted API key patterns, and send findings to the dashboard.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCommand:apiSpendScout.scanWorkspace",
+    "onCommand:apiSpendScout.openReport",
+    "onCommand:apiSpendScout.pushToDashboard"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "apiSpendScout.scanWorkspace", "title": "API Spend Scout Pro: Scan Workspace" },
+      { "command": "apiSpendScout.openReport", "title": "API Spend Scout Pro: Open Last Report" },
+      { "command": "apiSpendScout.pushToDashboard", "title": "API Spend Scout Pro: Push Last Report to Dashboard" }
+    ],
+    "configuration": {
+      "title": "API Spend Scout Pro",
+      "properties": {
+        "apiSpendScout.dashboardUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "Dashboard base URL"
+        },
+        "apiSpendScout.uploadToken": {
+          "type": "string",
+          "default": "dev-local-token",
+          "description": "Upload token for scan submission"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "echo ok"
+  },
+  "dependencies": {
+    "@api-spend/scanner": "workspace:*",
+    "@api-spend/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.95.0",
+    "typescript": "^5.7.3"
+  }
+}

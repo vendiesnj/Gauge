@@ -1,0 +1,8 @@
+node_modules
+.next
+dist
+.vscode-test
+.env.local
+pnpm-lock.yaml
+*.vsix
+coverage
