@@ -87,47 +87,18 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
   }
 }
 
-// ─── Anthropic ────────────────────────────────────────────────────────────────
-export async function fetchAnthropic(key: string): Promise<BillingResult | null> {
+// ─── Resend ───────────────────────────────────────────────────────────────────
+export async function fetchResend(key: string): Promise<BillingResult | null> {
   try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-    const anthropicHeaders = { "x-api-key": key, "anthropic-version": "2023-06-01" };
-
-    // Per-model pricing ($/1M tokens) — input, output
-    const MODEL_PRICING: Record<string, [number, number]> = {
-      "claude-opus-4":          [15.00,  75.00],
-      "claude-sonnet-4":        [ 3.00,  15.00],
-      "claude-3-5-sonnet":      [ 3.00,  15.00],
-      "claude-3-5-haiku":       [ 0.80,   4.00],
-      "claude-3-opus":          [15.00,  75.00],
-      "claude-3-sonnet":        [ 3.00,  15.00],
-      "claude-3-haiku":         [ 0.25,   1.25],
-      "claude-2":               [ 8.00,  24.00],
-    };
-
-    const usageRes = await fetch(
-      `https://api.anthropic.com/v1/organizations/usage?start_date=${startOfMonth}`,
-      { headers: anthropicHeaders }
-    );
-
-    if (usageRes.ok) {
-      const data = await usageRes.json();
-      let totalCost = 0;
-      for (const item of data.data ?? []) {
-        const model: string = item.model ?? "";
-        const modelKey = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k)) ?? "claude-3-5-sonnet";
-        const [inputRate, outputRate] = MODEL_PRICING[modelKey];
-        totalCost += ((item.input_tokens ?? 0) / 1_000_000) * inputRate + ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
-      }
-      return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
+    // Validate key via domains endpoint; Resend has no public billing API
+    const res = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (res.status === 401 || res.status === 403) {
+      return { vendorId: "resend", planName: "Resend", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid API key" };
     }
-
-    // Usage endpoint not accessible — validate key via models endpoint and store as connected
-    const validRes = await fetch("https://api.anthropic.com/v1/models", { headers: anthropicHeaders });
-    if (!validRes.ok) return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
-
-    return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: true };
+    if (!res.ok) return null;
+    return { vendorId: "resend", planName: "Resend", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: true };
   } catch {
     return null;
   }
@@ -224,35 +195,6 @@ async function fetchTwilio(key: string): Promise<BillingResult | null> {
   }
 }
 
-// ─── SendGrid ─────────────────────────────────────────────────────────────────
-async function fetchSendGrid(key: string): Promise<BillingResult | null> {
-  try {
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-    const endDate = now.toISOString().split("T")[0];
-
-    const res = await fetch(
-      `https://api.sendgrid.com/v3/stats?start_date=${startDate}&end_date=${endDate}&aggregated_by=month`,
-      { headers: { Authorization: `Bearer ${key}` } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-
-    const totalRequests = data[0]?.stats?.[0]?.metrics?.requests ?? 0;
-
-    return {
-      vendorId: "sendgrid",
-      planName: "Pay-as-you-go",
-      monthlySpendUsd: 0, // SendGrid free tier, actual cost requires plan lookup
-      usageIncluded: totalRequests,
-      unit: "emails this month",
-      source: "billing_api",
-    };
-  } catch (e) {
-    console.error("[billing/stripe] exception:", e);
-    return null;
-  }
-}
 
 // ─── Stripe OAuth ─────────────────────────────────────────────────────────────
 export async function fetchStripeOAuth(stripeAccountId: string): Promise<BillingResult | null> {
@@ -438,12 +380,11 @@ export async function fetchAWS(key: string): Promise<BillingResult | null> {
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 const BILLING_FETCHERS: Record<string, (key: string) => Promise<BillingResult | null>> = {
-  openai:    fetchOpenAI,
-  anthropic: fetchAnthropic,
-  stripe:    fetchStripe,
-  twilio:    fetchTwilio,
-  sendgrid:  fetchSendGrid,
-  aws:       fetchAWS,
+  openai:  fetchOpenAI,
+  resend:  fetchResend,
+  stripe:  fetchStripe,
+  twilio:  fetchTwilio,
+  aws:     fetchAWS,
 };
 
 export async function fetchBillingForKeys(

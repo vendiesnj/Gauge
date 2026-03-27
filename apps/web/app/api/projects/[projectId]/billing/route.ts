@@ -36,11 +36,10 @@ function parseEnvContent(content: string): Array<{ key: string; value: string }>
 
 // Match env key names to vendor IDs using common patterns
 const ENV_VENDOR_PATTERNS: Array<{ re: RegExp; vendorId: string }> = [
-  { re: /openai/i, vendorId: "openai" },
-  { re: /anthropic/i, vendorId: "anthropic" },
-  { re: /stripe/i, vendorId: "stripe" },
-  { re: /twilio/i, vendorId: "twilio" },
-  { re: /sendgrid/i, vendorId: "sendgrid" },
+  { re: /openai/i,  vendorId: "openai" },
+  { re: /resend/i,  vendorId: "resend" },
+  { re: /stripe/i,  vendorId: "stripe" },
+  { re: /twilio/i,  vendorId: "twilio" },
 ];
 
 export async function POST(
