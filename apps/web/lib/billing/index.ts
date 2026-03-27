@@ -411,14 +411,16 @@ export async function fetchAWS(key: string): Promise<BillingResult | null> {
       billingAccess: true,
     };
   } catch (err: unknown) {
-    const name = err instanceof Error ? err.name : "";
+    const name = err instanceof Error ? err.name : "UnknownError";
+    const msg = err instanceof Error ? err.message : String(err);
     if (name === "InvalidClientTokenId" || name === "InvalidSignatureException") {
       return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid credentials" };
     }
     if (name === "AccessDeniedException") {
-      return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks Cost Explorer access — attach the CostExplorerReadOnlyAccess policy" };
+      return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks Cost Explorer access — attach the inline policy" };
     }
-    return null;
+    // Surface any other AWS error so the user can see what's happening
+    return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: `${name}: ${msg}` };
   }
 }
 
