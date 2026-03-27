@@ -274,6 +274,18 @@ model SpendSnapshot {
   @@index([projectId, monthYear])
 }
 
+// ─── Vendor Billing API Requests ──────────────────────────────────────────────
+// Tracks demand for vendor billing integrations from the landing page.
+model VendorRequest {
+  id        String   @id @default(cuid())
+  email     String
+  vendorId  String
+  createdAt DateTime @default(now())
+
+  @@unique([email, vendorId])
+  @@index([vendorId])
+}
+
 // ─── Waitlist ─────────────────────────────────────────────────────────────────
 model Waitlist {
   id        String   @id @default(cuid())

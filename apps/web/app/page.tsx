@@ -1,7 +1,116 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+
+const VENDOR_GROUPS = [
+  {
+    label: "AI / LLM",
+    vendors: [
+      { id: "openai",      name: "OpenAI" },
+      { id: "anthropic",   name: "Anthropic" },
+      { id: "groq",        name: "Groq" },
+      { id: "mistral",     name: "Mistral AI" },
+      { id: "cohere",      name: "Cohere" },
+      { id: "replicate",   name: "Replicate" },
+      { id: "aws-bedrock", name: "AWS Bedrock" },
+      { id: "elevenlabs",  name: "ElevenLabs" },
+      { id: "assemblyai",  name: "AssemblyAI" },
+      { id: "deepgram",    name: "Deepgram" },
+      { id: "pinecone",    name: "Pinecone" },
+      { id: "huggingface", name: "Hugging Face" },
+      { id: "together",    name: "Together AI" },
+      { id: "perplexity",  name: "Perplexity" },
+    ],
+  },
+  {
+    label: "Payments",
+    vendors: [
+      { id: "stripe",         name: "Stripe" },
+      { id: "paddle",         name: "Paddle" },
+      { id: "plaid",          name: "Plaid" },
+      { id: "lemon-squeezy",  name: "Lemon Squeezy" },
+      { id: "braintree",      name: "Braintree" },
+      { id: "square",         name: "Square" },
+    ],
+  },
+  {
+    label: "SMS / Voice",
+    vendors: [
+      { id: "twilio",  name: "Twilio" },
+      { id: "vonage",  name: "Vonage" },
+      { id: "sinch",   name: "Sinch" },
+      { id: "messagebird", name: "MessageBird" },
+    ],
+  },
+  {
+    label: "Email",
+    vendors: [
+      { id: "resend",    name: "Resend" },
+      { id: "sendgrid",  name: "SendGrid" },
+      { id: "mailgun",   name: "Mailgun" },
+      { id: "postmark",  name: "Postmark" },
+      { id: "ses",       name: "AWS SES" },
+      { id: "mailchimp", name: "Mailchimp" },
+    ],
+  },
+  {
+    label: "Cloud / Infra",
+    vendors: [
+      { id: "aws",         name: "AWS" },
+      { id: "gcp",         name: "Google Cloud" },
+      { id: "azure",       name: "Azure" },
+      { id: "vercel",      name: "Vercel" },
+      { id: "cloudflare",  name: "Cloudflare" },
+      { id: "railway",     name: "Railway" },
+      { id: "render",      name: "Render" },
+      { id: "fly",         name: "Fly.io" },
+    ],
+  },
+  {
+    label: "Database",
+    vendors: [
+      { id: "supabase",    name: "Supabase" },
+      { id: "neon",        name: "Neon" },
+      { id: "planetscale", name: "PlanetScale" },
+      { id: "upstash",     name: "Upstash" },
+      { id: "mongodb",     name: "MongoDB Atlas" },
+      { id: "turso",       name: "Turso" },
+    ],
+  },
+  {
+    label: "Auth",
+    vendors: [
+      { id: "auth0",  name: "Auth0" },
+      { id: "clerk",  name: "Clerk" },
+      { id: "okta",   name: "Okta" },
+      { id: "workos", name: "WorkOS" },
+    ],
+  },
+  {
+    label: "Monitoring / Analytics",
+    vendors: [
+      { id: "datadog",  name: "Datadog" },
+      { id: "sentry",   name: "Sentry" },
+      { id: "axiom",    name: "Axiom" },
+      { id: "mixpanel", name: "Mixpanel" },
+      { id: "posthog",  name: "PostHog" },
+      { id: "segment",  name: "Segment" },
+      { id: "logrocket", name: "LogRocket" },
+    ],
+  },
+  {
+    label: "Search / Other",
+    vendors: [
+      { id: "algolia",     name: "Algolia" },
+      { id: "meilisearch", name: "Meilisearch" },
+      { id: "google-maps", name: "Google Maps" },
+      { id: "mapbox",      name: "Mapbox" },
+      { id: "pusher",      name: "Pusher" },
+      { id: "ably",        name: "Ably" },
+    ],
+  },
+];
 
 
 const KPI_ROWS = [
@@ -26,6 +135,54 @@ export default function LandingPage() {
   const [email, setEmail]   = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [msg, setMsg]       = useState("");
+
+  // Vendor request state
+  const [reqEmail,    setReqEmail]    = useState("");
+  const [selected,    setSelected]    = useState<Set<string>>(new Set());
+  const [reqStatus,   setReqStatus]   = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [reqMsg,      setReqMsg]      = useState("");
+  const [counts,      setCounts]      = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fetch("/api/vendor-requests")
+      .then(r => r.json())
+      .then(setCounts)
+      .catch(() => {});
+  }, []);
+
+  function toggleVendor(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function submitVendorRequests(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reqEmail.trim() || selected.size === 0) return;
+    setReqStatus("loading");
+    try {
+      const res = await fetch("/api/vendor-requests", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: reqEmail.trim(), vendorIds: [...selected] }),
+      });
+      if (!res.ok) throw new Error();
+      // Update counts optimistically
+      setCounts(prev => {
+        const next = { ...prev };
+        for (const id of selected) next[id] = (next[id] ?? 0) + 1;
+        return next;
+      });
+      setReqStatus("done");
+      setReqMsg(`Logged! We'll prioritize ${selected.size} vendor${selected.size !== 1 ? "s" : ""} based on demand.`);
+      setSelected(new Set());
+    } catch {
+      setReqStatus("error");
+      setReqMsg("Something went wrong. Try again.");
+    }
+  }
 
   async function joinWaitlist(e: React.FormEvent) {
     e.preventDefault();
@@ -215,6 +372,101 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Vendor request section */}
+          <div style={{ padding: "20px 0 60px" }}>
+            <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8, letterSpacing: "-0.02em", color: "var(--text)" }}>
+              Which vendors do you want us to support?
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 28, lineHeight: 1.6 }}>
+              We prioritize billing integrations based on demand. Select any vendors you use and we&apos;ll push harder to get them into Gauge.
+            </p>
+
+            {VENDOR_GROUPS.map(group => (
+              <div key={group.label} style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: 10 }}>
+                  {group.label}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {group.vendors.map(v => {
+                    const isSelected = selected.has(v.id);
+                    const count = counts[v.id];
+                    return (
+                      <button
+                        key={v.id}
+                        onClick={() => toggleVendor(v.id)}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 6,
+                          padding: "6px 12px", borderRadius: 999, fontSize: 13, fontWeight: 600,
+                          cursor: "pointer", transition: "all 0.1s",
+                          border: isSelected ? "1.5px solid #1a56db" : "1.5px solid var(--border)",
+                          background: isSelected ? "rgba(26,86,219,0.08)" : "var(--panel)",
+                          color: isSelected ? "#1a56db" : "var(--text)",
+                          backdropFilter: "blur(4px)",
+                        }}
+                      >
+                        {isSelected && <span style={{ fontSize: 11 }}>✓</span>}
+                        {v.name}
+                        {count != null && count > 0 && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: "1px 5px",
+                            borderRadius: 999,
+                            background: isSelected ? "rgba(26,86,219,0.15)" : "rgba(0,0,0,0.06)",
+                            color: isSelected ? "#1a56db" : "var(--muted)",
+                          }}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {selected.size > 0 && (
+              <div style={{ marginTop: 24, padding: "16px 20px", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--border)", backdropFilter: "blur(6px)" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>
+                  {selected.size} vendor{selected.size !== 1 ? "s" : ""} selected — drop your email to log your vote
+                </p>
+                {reqStatus === "done" ? (
+                  <p style={{ color: "#059669", fontWeight: 600, fontSize: 14 }}>{reqMsg}</p>
+                ) : (
+                  <form onSubmit={submitVendorRequests} style={{ display: "flex", gap: 8, maxWidth: 440 }}>
+                    <input
+                      type="email"
+                      placeholder="your@email.com"
+                      value={reqEmail}
+                      onChange={e => setReqEmail(e.target.value)}
+                      required
+                      style={{
+                        flex: 1, padding: "9px 13px", borderRadius: 8,
+                        border: "1px solid var(--border-strong)",
+                        background: "var(--bg)", color: "var(--text)",
+                        fontSize: 14, outline: "none",
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={reqStatus === "loading"}
+                      style={{
+                        padding: "9px 16px", borderRadius: 8, border: "none",
+                        background: "linear-gradient(135deg, #1a56db 0%, #0ea47a 100%)",
+                        color: "#fff", fontSize: 13, fontWeight: 700,
+                        cursor: "pointer", whiteSpace: "nowrap",
+                        opacity: reqStatus === "loading" ? 0.6 : 1,
+                      }}
+                    >
+                      {reqStatus === "loading" ? "Saving…" : "Submit"}
+                    </button>
+                  </form>
+                )}
+                {reqStatus === "error" && (
+                  <p style={{ color: "#dc2626", fontSize: 12, marginTop: 6 }}>{reqMsg}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* How it works */}
