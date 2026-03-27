@@ -12,9 +12,9 @@ const MANUAL_VENDORS = [
     id: "anthropic",
     name: "Anthropic",
     placeholder: "sk-ant-…",
-    hint: "Requires an Admin API key (not a regular API key) — create one under Organization settings.",
-    helpUrl: "https://console.anthropic.com/settings/admin-keys",
-    helpLabel: "Create Admin API key →",
+    hint: "Paste any Anthropic API key to confirm your account is connected. Live usage data requires Anthropic to enable the usage API for your org.",
+    helpUrl: "https://console.anthropic.com/settings/keys",
+    helpLabel: "Get API key →",
   },
   {
     id: "twilio",

@@ -123,14 +123,11 @@ export async function fetchAnthropic(key: string): Promise<BillingResult | null>
       return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
     }
 
-    if (usageRes.status === 403) {
-      return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks usage:read scope" };
-    }
-
+    // Usage endpoint not accessible — validate key via models endpoint and store as connected
     const validRes = await fetch("https://api.anthropic.com/v1/models", { headers: anthropicHeaders });
     if (!validRes.ok) return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
 
-    return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks usage:read scope" };
+    return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: true };
   } catch {
     return null;
   }
