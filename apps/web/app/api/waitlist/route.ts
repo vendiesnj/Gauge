@@ -61,13 +61,13 @@ export async function POST(req: NextRequest) {
               Private beta · Gauge
             </p>
             <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#4a3f2f;">
-              Thanks for signing up! I'm building Gauge to give developers a clear view of what they're actually spending across every API — OpenAI, Stripe, Twilio, AWS, and more.
+              Thanks for signing up! I'm building Gauge to give developers a clear view of what they're actually spending across every API: OpenAI, Stripe, Twilio, AWS, and more.
             </p>
             <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#4a3f2f;">
               No more digging through five different dashboards. Connect your keys, see your spend, and find out exactly where you can cut costs!
             </p>
             <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#4a3f2f;">
-              I'll reach out personally when your spot is ready — early users get to shape the product directly. In the meantime, reply to this email with any vendors you want prioritized!
+              I'll reach out personally when your spot is ready. Early users get to shape the product directly. In the meantime, reply to this email with any vendors you want prioritized!
             </p>
 
             <!-- Divider -->
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
           <td style="background:#ede9e0;border-top:1px solid #d6cfc4;padding:16px 32px;">
             <p style="margin:0;font-size:12px;color:#8a7255;line-height:1.6;">
               You signed up at <a href="https://getgauge.dev" style="color:#1a56db;text-decoration:none;">getgauge.dev</a>.
-              Reply to this email with any questions — I read every one.
+              Reply to this email with any questions. I read every one.
             </p>
           </td>
         </tr>

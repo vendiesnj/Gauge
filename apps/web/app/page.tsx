@@ -228,7 +228,7 @@ export default function LandingPage() {
       });
       if (!res.ok) throw new Error("Failed");
       setStatus("done");
-      setMsg("You're on the list — check your email.");
+      setMsg("You're on the list. Check your email.");
     } catch {
       setStatus("error");
       setMsg("Something went wrong. Try again.");
@@ -292,7 +292,7 @@ export default function LandingPage() {
                 fontSize: 11.5, fontWeight: 600, color: "#5a4530",
                 marginBottom: 22, backdropFilter: "blur(6px)",
               }}>
-                🔒 Private beta{waitlistCount ? ` · ${waitlistCount.toLocaleString()} on the list` : " — join the waitlist"}
+                🔒 Private beta{waitlistCount ? ` · ${waitlistCount.toLocaleString()} on the list` : " · join the waitlist"}
               </div>
 
               <h1 style={{
