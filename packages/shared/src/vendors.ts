@@ -15,9 +15,9 @@ export const VENDORS: VendorDefinition[] = [
     planDiscovery: { canOAuth: false, notes: "Requires billing export or usage API key." },
     cheaperAlternativeHeadline: "GPT-4 class models often have cheaper alternatives for classification/extraction tasks.",
     alternatives: [
-      { vendorId: "anthropic", rationale: "Claude models competitive for many text tasks.", estimatedSavingsPct: 5 },
       { vendorId: "groq", rationale: "Near-zero latency inference on open models, drastically cheaper for high-throughput.", estimatedSavingsPct: 60 },
       { vendorId: "mistral", rationale: "Open-weight models via API, significantly cheaper per token.", estimatedSavingsPct: 50 },
+      { vendorId: "anthropic", rationale: "Claude models competitive for many text tasks.", estimatedSavingsPct: 5 },
       { vendorId: "aws-bedrock", rationale: "Centralize multi-model access, governance, and cost.", estimatedSavingsPct: 10 },
     ],
   },

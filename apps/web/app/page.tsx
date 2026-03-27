@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 const VENDOR_GROUPS = [
   {
@@ -123,19 +122,19 @@ const FEATURES = [
   {
     icon: "📊",
     title: "Direct from vendor APIs",
-    body: "We pull usage and spend straight from each vendor's billing API — not inferred from your bank statement. Real token counts, SMS volumes, and dollar amounts.",
+    body: "We pull usage and spend straight from each vendor's billing API, not inferred from your bank statement. Real token counts, SMS volumes, and dollar amounts.",
     badge: null,
   },
   {
     icon: "🗳️",
     title: "Built around actual demand",
-    body: "Vote on which vendors to support next. Every integration we ship is driven by what developers are actually using — not what looks good on a feature list.",
+    body: "Vote on which vendors to support next. Every integration we ship is driven by what developers are actually using, not what looks good on a feature list.",
     badge: null,
   },
   {
     icon: "📈",
     title: "Rate benchmarks",
-    body: "See how your effective rate compares to teams your size. Know when you're paying above median — and when you've grown large enough to negotiate enterprise pricing.",
+    body: "See how your effective rate compares to teams your size. Know when you're paying above median, and when you've grown large enough to negotiate enterprise pricing.",
     badge: "Coming soon",
   },
 ];
@@ -155,8 +154,8 @@ const TABLE_ROWS = [
 ];
 
 const HOW_IT_WORKS = [
-  { step: "1", title: "Connect your vendors", body: "Link OpenAI, Stripe, Twilio, and AWS with your API keys. Under 2 minutes. Keys stored encrypted — never shared." },
-  { step: "2", title: "See your real spend",  body: "Gauge pulls live billing data directly from each vendor API. No estimates — actual dollars by service." },
+  { step: "1", title: "Connect your vendors", body: "Link OpenAI, Stripe, Twilio, and AWS with your API keys. Under 2 minutes. Keys stored encrypted, never shared." },
+  { step: "2", title: "See your real spend",  body: "Gauge pulls live billing data directly from each vendor API. No estimates. Actual dollars by service." },
   { step: "3", title: "Find savings",         body: "See unused capacity, cheaper alternatives, and exactly how much you'd save by switching." },
 ];
 
@@ -172,6 +171,11 @@ export default function LandingPage() {
   const [reqMsg,      setReqMsg]      = useState("");
   const [counts,      setCounts]      = useState<Record<string, number>>({});
   const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Lock landing page to warm theme regardless of user's saved preference
+    document.documentElement.setAttribute("data-theme", "gauge");
+  }, []);
 
   useEffect(() => {
     fetch("/api/vendor-requests")
@@ -268,12 +272,7 @@ export default function LandingPage() {
           <img src="/logo.png" alt="Gauge" style={{ height: 42, width: "auto", display: "block" }} />
         </div>
 
-        {/* Right: theme switcher */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: 155 }}>
-            <ThemeSwitcher direction="down" />
-          </div>
-        </div>
+        <div style={{ flex: 1 }} />
       </nav>
 
       {/* ── Main desktop area ── */}
@@ -310,8 +309,8 @@ export default function LandingPage() {
               </h1>
 
               <p style={{ fontSize: 17, lineHeight: 1.7, marginBottom: 32, color: "var(--muted)" }}>
-                Connect your vendors and Gauge pulls real billing data directly from their APIs —
-                spots wasted spend, and shows you what switching would actually save.
+                Connect your vendors and Gauge pulls real billing data directly from their APIs.
+                Spots wasted spend and shows you what switching would actually save.
               </p>
 
               {status === "done" ? (
@@ -389,7 +388,7 @@ export default function LandingPage() {
                     <span className="os-dot dot-yellow" />
                     <span className="os-dot dot-green" />
                   </div>
-                  <span className="os-window-title">Gauge — my-startup / production</span>
+                  <span className="os-window-title">Gauge · my-startup / production</span>
                 </div>
                 <div style={{ padding: 18 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
@@ -484,7 +483,7 @@ export default function LandingPage() {
             {selected.size > 0 && (
               <div style={{ marginTop: 24, padding: "16px 20px", borderRadius: 12, background: "var(--panel)", border: "1px solid var(--border)", backdropFilter: "blur(6px)" }}>
                 <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>
-                  {selected.size} vendor{selected.size !== 1 ? "s" : ""} selected — drop your email to log your vote
+                  {selected.size} vendor{selected.size !== 1 ? "s" : ""} selected. Drop your email to log your vote.
                 </p>
                 {reqStatus === "done" ? (
                   <p style={{ color: "#059669", fontWeight: 600, fontSize: 14 }}>{reqMsg}</p>
