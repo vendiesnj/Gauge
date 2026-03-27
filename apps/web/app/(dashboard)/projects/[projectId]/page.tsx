@@ -1,10 +1,11 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
-import { buildCostInsights, VENDOR_MAP } from "@api-spend/shared";
+import { buildCostInsights } from "@api-spend/shared";
 import Link from "next/link";
 import { RecalculateButton } from "./RecalculateButton";
 import { ConnectVendorCard } from "./ConnectVendorCard";
+import { SpendTable } from "./SpendTable";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -159,52 +160,7 @@ export default async function ProjectDetailPage({
                 <div className="heading-sm">Spend & recommendations</div>
                 <RecalculateButton projectId={projectId} />
               </div>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Vendor</th>
-                    <th>Monthly</th>
-                    <th>Unused</th>
-                    <th>Alt estimate</th>
-                    <th>Savings</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {insights.map((insight) => {
-                    const vendor = VENDOR_MAP[insight.vendorId];
-                    const alt = vendor?.alternatives[0];
-                    const altVendor = alt ? VENDOR_MAP[alt.vendorId] : null;
-                    return (
-                      <tr key={insight.vendorId}>
-                        <td style={{ fontWeight: 600 }}>{insight.vendorName}</td>
-                        <td>${insight.monthlySpendUsd.toFixed(0)}</td>
-                        <td>
-                          {insight.estimatedUnusedSpendUsd > 0 ? (
-                            <span className="text-warn">${insight.estimatedUnusedSpendUsd.toFixed(0)}</span>
-                          ) : (
-                            <span className="muted">—</span>
-                          )}
-                        </td>
-                        <td>
-                          {insight.alternativeStackMonthlyUsd != null ? (
-                            <span>
-                              ${insight.alternativeStackMonthlyUsd.toFixed(0)}
-                              {altVendor && <span className="muted small"> ({altVendor.name})</span>}
-                            </span>
-                          ) : "—"}
-                        </td>
-                        <td>
-                          {insight.savingsVsAlternativePct != null ? (
-                            <span className="text-good" style={{ fontWeight: 700 }}>
-                              {insight.savingsVsAlternativePct.toFixed(0)}%
-                            </span>
-                          ) : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <SpendTable insights={insights} plans={plans} />
               {insights.some((i) => i.notes.length > 0) && (
                 <div style={{ marginTop: 12 }}>
                   {insights.flatMap((i) => i.notes).map((note, idx) => (
