@@ -25,13 +25,17 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
       `https://api.openai.com/v1/organization/costs?start_time=${startOfMonth}&bucket_width=1d&limit=31`,
       { headers }
     );
+    console.log("[openai billing] costs status:", costsRes.status);
 
     if (costsRes.ok) {
       const data = await costsRes.json();
+      console.log("[openai billing] costs body:", JSON.stringify(data).slice(0, 500));
       let totalCost = 0;
       for (const bucket of data.data ?? []) {
         for (const result of bucket.results ?? []) {
-          totalCost += result.amount?.value ?? 0;
+          // amount.value may be a string or nested differently depending on API version
+          const val = result.amount?.value ?? result.amount ?? 0;
+          totalCost += Number(val) || 0;
         }
       }
       return {
@@ -40,6 +44,9 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
         monthlySpendUsd: Math.round(totalCost * 100) / 100,
         source: "billing_api",
       };
+    } else {
+      const errText = await costsRes.text();
+      console.log("[openai billing] costs error:", errText.slice(0, 300));
     }
 
     // Costs API failed — fall back to usage API with per-model pricing
@@ -47,6 +54,7 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
       `https://api.openai.com/v1/organization/usage/completions?start_time=${startOfMonth}&limit=100`,
       { headers }
     );
+    console.log("[openai billing] usage status:", usageRes.status);
 
     if (usageRes.ok) {
       const data = await usageRes.json();

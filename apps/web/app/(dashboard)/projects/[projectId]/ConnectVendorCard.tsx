@@ -258,7 +258,7 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
           <p className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
             Connect with API key
           </p>
-          <span className="muted" style={{ fontSize: 10 }}>Keys are used once and never stored</span>
+          <span className="muted" style={{ fontSize: 10 }}>Keys stored encrypted · used for daily refresh</span>
         </div>
         <div className="stack gap-8">
           {/* OpenAI — special two-input flow */}
