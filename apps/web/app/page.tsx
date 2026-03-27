@@ -94,7 +94,7 @@ export default function LandingPage() {
 
               <h1 style={{
                 fontSize: 50, fontWeight: 900, lineHeight: 1.05,
-                marginBottom: 18, letterSpacing: "-0.03em", color: "#1a1208",
+                marginBottom: 18, letterSpacing: "-0.03em", color: "var(--text)",
               }}>
                 See exactly what you&apos;re spending<br />
                 across{" "}
@@ -104,7 +104,7 @@ export default function LandingPage() {
                 }}>every API</span>
               </h1>
 
-              <p style={{ fontSize: 17, lineHeight: 1.7, marginBottom: 32, color: "#5a4a30" }}>
+              <p style={{ fontSize: 17, lineHeight: 1.7, marginBottom: 32, color: "var(--muted)" }}>
                 Connect OpenAI, Stripe, Twilio, and AWS. Gauge pulls real billing data,
                 spots wasted spend, and shows you what switching vendors would actually save.
               </p>
@@ -125,9 +125,9 @@ export default function LandingPage() {
                     required
                     style={{
                       flex: 1, padding: "11px 15px", borderRadius: 10,
-                      border: "1px solid rgba(0,0,0,0.14)",
-                      background: "rgba(255,255,255,0.75)",
-                      color: "#1a1208", fontSize: 15, outline: "none",
+                      border: "1px solid var(--border-strong)",
+                      background: "var(--panel)",
+                      color: "var(--text)", fontSize: 15, outline: "none",
                       backdropFilter: "blur(4px)",
                     }}
                   />
@@ -159,8 +159,8 @@ export default function LandingPage() {
                 {["OpenAI", "Stripe", "Twilio", "AWS", "Anthropic"].map(v => (
                   <span key={v} style={{
                     padding: "5px 13px", borderRadius: 999,
-                    background: "rgba(255,255,255,0.6)", border: "1px solid rgba(0,0,0,0.1)",
-                    fontSize: 12.5, fontWeight: 600, color: "#3a2f1e",
+                    background: "var(--panel)", border: "1px solid var(--border)",
+                    fontSize: 12.5, fontWeight: 600, color: "var(--text)",
                     backdropFilter: "blur(4px)",
                   }}>{v}</span>
                 ))}
@@ -219,13 +219,13 @@ export default function LandingPage() {
 
           {/* How it works */}
           <div style={{ padding: "20px 0 80px" }}>
-            <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 28, letterSpacing: "-0.02em", color: "#1a1208" }}>
+            <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 28, letterSpacing: "-0.02em", color: "var(--text)" }}>
               How it works
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
               {HOW_IT_WORKS.map(f => (
                 <div key={f.step} style={{
-                  background: "rgba(255,255,255,0.65)", border: "1px solid rgba(0,0,0,0.09)",
+                  background: "var(--panel)", border: "1px solid var(--border)",
                   borderRadius: 14, padding: "22px 20px", backdropFilter: "blur(6px)",
                   boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
                 }}>
@@ -235,8 +235,8 @@ export default function LandingPage() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     color: "#fff", fontWeight: 800, fontSize: 13, marginBottom: 14,
                   }}>{f.step}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "#1a1208" }}>{f.title}</div>
-                  <p style={{ fontSize: 13, color: "#6b5538", lineHeight: 1.65 }}>{f.body}</p>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>{f.title}</div>
+                  <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.65 }}>{f.body}</p>
                 </div>
               ))}
             </div>
@@ -250,7 +250,7 @@ export default function LandingPage() {
         borderTop: "1px solid rgba(0,0,0,0.08)",
         padding: "18px 40px",
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        background: "rgba(232,221,208,0.6)", backdropFilter: "blur(8px)",
+        background: "var(--panel-2)", backdropFilter: "blur(8px)",
       }}>
         <span style={{ fontWeight: 800, background: "linear-gradient(135deg, #1a56db, #0ea47a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Gauge</span>
         <span style={{ color: "#8a7255", fontSize: 12 }}>© 2026 Gauge. Built in public.</span>
