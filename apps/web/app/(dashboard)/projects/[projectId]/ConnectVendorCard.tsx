@@ -10,9 +10,30 @@ const OAUTH_VENDORS = [
 ] as const;
 
 const MANUAL_VENDORS = [
-  { id: "anthropic", name: "Anthropic", placeholder: "sk-ant-…", hint: "Admin API key with usage:read scope" },
-  { id: "twilio", name: "Twilio", placeholder: "ACxxx:authtoken", hint: "AccountSID:AuthToken" },
-  { id: "sendgrid", name: "SendGrid", placeholder: "SG.…", hint: "API key with stats.read scope" },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    placeholder: "sk-ant-…",
+    hint: "Any API key works — Anthropic grants usage access automatically.",
+    helpUrl: "https://console.anthropic.com/settings/keys",
+    helpLabel: "Get API key →",
+  },
+  {
+    id: "twilio",
+    name: "Twilio",
+    placeholder: "ACxxx:authtoken",
+    hint: "Paste as AccountSID:AuthToken — find both on your Twilio console homepage.",
+    helpUrl: "https://console.twilio.com/",
+    helpLabel: "Find AccountSID & AuthToken →",
+  },
+  {
+    id: "sendgrid",
+    name: "SendGrid",
+    placeholder: "SG.…",
+    hint: "API key with at least Stats > Read access.",
+    helpUrl: "https://app.sendgrid.com/settings/api_keys",
+    helpLabel: "Create API key →",
+  },
 ] as const;
 
 type Status = "idle" | "loading" | "done" | "error";
@@ -283,10 +304,17 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
                 {openaiRow.open && (
                   <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
                     <p className="muted" style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 10 }}>
-                      Provide your OpenAI Project ID and an admin key. Gauge will create a service account — the admin key is never stored.{" "}
+                      Gauge needs your OpenAI Project ID and an admin API key to read usage data. The key is stored encrypted and used for daily billing refreshes.{" "}
                       <a href="https://platform.openai.com/settings/organization/projects" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
                         Find Project ID →
                       </a>
+                      {" · "}
+                      <a href="https://platform.openai.com/settings/organization/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+                        Create admin key →
+                      </a>
+                      {" (set Role to "}
+                      <strong>All</strong>
+                      {" when creating)"}
                     </p>
                     <div className="stack gap-8">
                       <input
@@ -373,7 +401,10 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
                 {row.open && (
                   <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
                     <p className="muted" style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 10 }}>
-                      {vendor.hint}
+                      {vendor.hint}{" "}
+                      <a href={vendor.helpUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+                        {vendor.helpLabel}
+                      </a>
                     </p>
                     <div className="row gap-8">
                       <input
