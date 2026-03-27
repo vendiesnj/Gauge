@@ -2,6 +2,7 @@ import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -16,9 +17,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="app-shell">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-logo">
-          <div className="logo-icon" style={{ color: "#fff", fontWeight: 900, fontSize: 15 }}>G</div>
-          <span className="gradient-text">Gauge</span>
+        <div className="sidebar-logo" style={{ gap: 0 }}>
+          <img src="/logo.png" alt="G" style={{ width: 38, height: 38, display: "block", mixBlendMode: "multiply" }} />
+          <span className="gradient-text" style={{ marginLeft: -2 }}>auge</span>
         </div>
 
         <nav className="sidebar-nav">
@@ -73,6 +74,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 </div>
               )}
             </div>
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <ThemeSwitcher />
           </div>
           <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
             <button type="submit" className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "flex-start" }}>

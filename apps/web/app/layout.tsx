@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: { default: "Gauge", template: "%s | Gauge" },
@@ -8,8 +9,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(function(){try{var t=localStorage.getItem('gauge-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`}
+        </Script>
+        {children}
+      </body>
     </html>
   );
 }

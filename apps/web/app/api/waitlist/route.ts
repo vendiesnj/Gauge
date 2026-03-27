@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: NextRequest) {
-  const { email, source } = await req.json().catch(() => ({}));
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const { email, source } = body;
 
   if (!email || typeof email !== "string" || !email.includes("@")) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
@@ -14,16 +18,22 @@ export async function POST(req: NextRequest) {
   const normalized = email.trim().toLowerCase();
 
   // Upsert so duplicate submissions don't error
-  await db.waitlist.upsert({
-    where: { email: normalized },
-    update: {},
-    create: { email: normalized, source: source ?? "landing" },
-  });
+  try {
+    await db.waitlist.upsert({
+      where: { email: normalized },
+      update: {},
+      create: { email: normalized, source: typeof source === "string" ? source : "landing" },
+    });
+  } catch (err) {
+    console.error("[waitlist] db error:", err);
+    return NextResponse.json({ error: "DB error" }, { status: 500 });
+  }
 
   // Send thank you email
   if (process.env.RESEND_API_KEY) {
+    const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
-      from: "Maggie at Gauge <maggie@getgauge.dev>",
+      from: "Adam at Gauge <adam@getgauge.dev>",
       to: normalized,
       subject: "You're on the Gauge waitlist",
       html: `
@@ -39,7 +49,7 @@ export async function POST(req: NextRequest) {
             I'm in active development and will reach out personally when your spot is ready. Early access users get to shape the product.
           </p>
           <p style="color: #475569; line-height: 1.6; margin-bottom: 32px;">
-            — Maggie
+            — Adam
           </p>
           <hr style="border: none; border-top: 1px solid #e2e8f0; margin-bottom: 24px;" />
           <p style="color: #94a3b8; font-size: 13px;">
