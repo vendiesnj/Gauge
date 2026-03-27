@@ -9,6 +9,14 @@ const OAUTH_VENDORS = [
 
 const MANUAL_VENDORS = [
   {
+    id: "anthropic",
+    name: "Anthropic",
+    placeholder: "sk-ant-admin-…",
+    hint: "Requires an Admin API key — create one at console.anthropic.com under your Organization settings.",
+    helpUrl: "https://console.anthropic.com/settings/admin-keys",
+    helpLabel: "Create Admin API key →",
+  },
+  {
     id: "resend",
     name: "Resend",
     placeholder: "re_…",
@@ -318,7 +326,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
         ) : (
           <>
             <p className="small" style={{ fontWeight: 500, marginBottom: 2 }}>Drop your .env file here</p>
-            <p className="muted small">Gauge detects OpenAI, Resend, Stripe, Twilio keys automatically</p>
+            <p className="muted small">Gauge detects OpenAI, Anthropic, Resend, Stripe, Twilio keys automatically</p>
           </>
         )}
       </div>

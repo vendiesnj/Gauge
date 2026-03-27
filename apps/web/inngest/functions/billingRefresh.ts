@@ -1,7 +1,7 @@
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
-import { fetchOpenAI, fetchStripeOAuth, fetchVercelBilling, fetchGoogleBilling } from "@/lib/billing";
+import { fetchOpenAI, fetchAnthropic, fetchStripeOAuth, fetchVercelBilling, fetchGoogleBilling } from "@/lib/billing";
 import type { BillingResult } from "@/lib/billing";
 
 export const dailyBillingRefresh = inngest.createFunction(
@@ -30,6 +30,9 @@ export const dailyBillingRefresh = inngest.createFunction(
         switch (conn.vendorId) {
           case "openai":
             result = await fetchOpenAI(adminKey);
+            break;
+          case "anthropic":
+            result = await fetchAnthropic(adminKey);
             break;
           case "stripe":
             result = await fetchStripeOAuth(adminKey);

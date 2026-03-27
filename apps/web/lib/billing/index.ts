@@ -87,6 +87,51 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
   }
 }
 
+// ─── Anthropic ────────────────────────────────────────────────────────────────
+// Requires an Admin API key (sk-ant-admin-...) from console.anthropic.com/settings/admin-keys
+export async function fetchAnthropic(key: string): Promise<BillingResult | null> {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const headers = { "x-api-key": key, "anthropic-version": "2023-06-01" };
+
+    const MODEL_PRICING: Record<string, [number, number]> = {
+      "claude-opus-4":     [15.00, 75.00],
+      "claude-sonnet-4":   [ 3.00, 15.00],
+      "claude-3-5-sonnet": [ 3.00, 15.00],
+      "claude-3-5-haiku":  [ 0.80,  4.00],
+      "claude-3-opus":     [15.00, 75.00],
+      "claude-3-haiku":    [ 0.25,  1.25],
+      "claude-2":          [ 8.00, 24.00],
+    };
+
+    const usageRes = await fetch(
+      `https://api.anthropic.com/v1/organizations/usage_report/messages?start_date=${startOfMonth}`,
+      { headers }
+    );
+
+    if (usageRes.ok) {
+      const data = await usageRes.json();
+      let totalCost = 0;
+      for (const item of data.data ?? []) {
+        const model: string = item.model ?? "";
+        const modelKey = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k)) ?? "claude-3-5-sonnet";
+        const [inputRate, outputRate] = MODEL_PRICING[modelKey];
+        totalCost += ((item.input_tokens ?? 0) / 1_000_000) * inputRate + ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
+      }
+      return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
+    }
+
+    if (usageRes.status === 401) {
+      return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
+    }
+
+    return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: `Usage API returned ${usageRes.status} — check key has usage:read permission` };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Resend ───────────────────────────────────────────────────────────────────
 export async function fetchResend(key: string): Promise<BillingResult | null> {
   try {
@@ -380,11 +425,12 @@ export async function fetchAWS(key: string): Promise<BillingResult | null> {
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 const BILLING_FETCHERS: Record<string, (key: string) => Promise<BillingResult | null>> = {
-  openai:  fetchOpenAI,
-  resend:  fetchResend,
-  stripe:  fetchStripe,
-  twilio:  fetchTwilio,
-  aws:     fetchAWS,
+  openai:    fetchOpenAI,
+  anthropic: fetchAnthropic,
+  resend:    fetchResend,
+  stripe:    fetchStripe,
+  twilio:    fetchTwilio,
+  aws:       fetchAWS,
 };
 
 export async function fetchBillingForKeys(
