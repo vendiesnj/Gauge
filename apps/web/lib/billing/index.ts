@@ -10,6 +10,10 @@ export type BillingResult = {
   usageIncluded?: number;
   unit?: string;
   source: "billing_api";
+  // Verification fields — null means "not checked"
+  keyValid?: boolean;
+  billingAccess?: boolean;
+  verifyError?: string;
 };
 
 // ─── OpenAI ───────────────────────────────────────────────────────────────────
@@ -33,17 +37,17 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
       let totalCost = 0;
       for (const bucket of data.data ?? []) {
         for (const result of bucket.results ?? []) {
-          // amount.value may be a string or nested differently depending on API version
           const val = result.amount?.value ?? result.amount ?? 0;
           totalCost += Number(val) || 0;
         }
       }
-      return {
-        vendorId: "openai",
-        planName: "Pay-as-you-go",
-        monthlySpendUsd: Math.round(totalCost * 100) / 100,
-        source: "billing_api",
-      };
+      return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
+    }
+
+    if (costsRes.status === 403) {
+      // Key is valid but lacks billing permission — fall back to usage API
+    } else if (costsRes.status === 401) {
+      return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
     } else {
       const errText = await costsRes.text();
       console.log("[openai billing] costs error:", errText.slice(0, 300));
@@ -58,39 +62,31 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
 
     if (usageRes.ok) {
       const data = await usageRes.json();
-      // Per-model pricing ($/1M tokens) — input, output
       const MODEL_PRICING: Record<string, [number, number]> = {
-        "gpt-4o":                [2.50,  10.00],
-        "gpt-4o-mini":           [0.15,   0.60],
-        "gpt-4-turbo":           [10.00, 30.00],
-        "gpt-4":                 [30.00, 60.00],
-        "o1":                    [15.00, 60.00],
-        "o1-mini":               [3.00,  12.00],
-        "o3-mini":               [1.10,   4.40],
-        "gpt-3.5-turbo":         [0.50,   1.50],
+        "gpt-4o":        [2.50, 10.00],
+        "gpt-4o-mini":   [0.15,  0.60],
+        "gpt-4-turbo":   [10.00, 30.00],
+        "gpt-4":         [30.00, 60.00],
+        "o1":            [15.00, 60.00],
+        "o1-mini":       [3.00,  12.00],
+        "o3-mini":       [1.10,   4.40],
+        "gpt-3.5-turbo": [0.50,   1.50],
       };
       let totalCost = 0;
       for (const item of data.data ?? []) {
         const model: string = item.model ?? "";
         const modelKey = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k)) ?? "gpt-4o";
         const [inputRate, outputRate] = MODEL_PRICING[modelKey];
-        totalCost +=
-          ((item.input_tokens ?? 0) / 1_000_000) * inputRate +
-          ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
+        totalCost += ((item.input_tokens ?? 0) / 1_000_000) * inputRate + ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
       }
-      return {
-        vendorId: "openai",
-        planName: "Pay-as-you-go",
-        monthlySpendUsd: Math.round(totalCost * 100) / 100,
-        source: "billing_api",
-      };
+      return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
     }
 
-    // Key valid but no billing scope — return $0 so it shows as connected
+    // Key valid but no billing scope
     const validRes = await fetch("https://api.openai.com/v1/models?limit=1", { headers });
-    if (!validRes.ok) return null;
+    if (!validRes.ok) return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
 
-    return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api" };
+    return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks billing permission. Create an org-level key with All permissions." };
   } catch {
     return null;
   }
@@ -127,22 +123,19 @@ export async function fetchAnthropic(key: string): Promise<BillingResult | null>
         const model: string = item.model ?? "";
         const modelKey = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k)) ?? "claude-3-5-sonnet";
         const [inputRate, outputRate] = MODEL_PRICING[modelKey];
-        totalCost +=
-          ((item.input_tokens ?? 0) / 1_000_000) * inputRate +
-          ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
+        totalCost += ((item.input_tokens ?? 0) / 1_000_000) * inputRate + ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
       }
-      return {
-        vendorId: "anthropic",
-        planName: "Pay-as-you-go",
-        monthlySpendUsd: Math.round(totalCost * 100) / 100,
-        source: "billing_api",
-      };
+      return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
+    }
+
+    if (usageRes.status === 403) {
+      return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks usage:read scope" };
     }
 
     const validRes = await fetch("https://api.anthropic.com/v1/models", { headers: anthropicHeaders });
-    if (!validRes.ok) return null;
+    if (!validRes.ok) return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
 
-    return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api" };
+    return { vendorId: "anthropic", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks usage:read scope" };
   } catch {
     return null;
   }

@@ -123,6 +123,8 @@ export async function POST(
       updated: billingResults.length,
       vendors: billingResults.map((r) => r.vendorId),
       monthlySpendUsd: firstResult?.monthlySpendUsd,
+      billingAccess: firstResult?.billingAccess,
+      verifyError: firstResult?.verifyError,
     });
   }
 

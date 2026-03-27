@@ -64,6 +64,9 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
   const [connected, setConnected] = useState<string[]>([]);
   const [loadingConnections, setLoadingConnections] = useState(true);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [envStatus, setEnvStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [envMsg, setEnvMsg] = useState("");
+  const [envDragOver, setEnvDragOver] = useState(false);
 
   const [manualRows, setManualRows] = useState<Record<string, ManualRowState>>(
     Object.fromEntries(
@@ -124,9 +127,12 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
       if (!res.ok) throw new Error(data.error ?? "Failed");
       if (data.updated > 0) {
         const spend = data.monthlySpendUsd ?? 0;
+        const billingAccess = data.billingAccess !== false;
         updateManual(vendorId, {
           status: "done",
-          msg: spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected",
+          msg: !billingAccess
+            ? `Key valid but no billing access — ${data.verifyError ?? "check key permissions"}`
+            : spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected ($0 spend this month)",
           key: "",
           open: false,
         });
@@ -139,6 +145,33 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
         status: "error",
         msg: err instanceof Error ? err.message : "Failed",
       });
+    }
+  }
+
+  async function handleEnvFile(file: File) {
+    setEnvStatus("loading");
+    setEnvMsg("");
+    try {
+      const envContent = await file.text();
+      const res = await fetch(`/api/projects/${projectId}/billing`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ envContent }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      if (data.updated > 0) {
+        setEnvStatus("done");
+        setEnvMsg(`Connected ${data.updated} vendor${data.updated !== 1 ? "s" : ""}: ${data.vendors.join(", ")}`);
+        router.refresh();
+        fetchConnections();
+      } else {
+        setEnvStatus("error");
+        setEnvMsg("No recognized vendor keys found in this file.");
+      }
+    } catch (err) {
+      setEnvStatus("error");
+      setEnvMsg(err instanceof Error ? err.message : "Failed");
     }
   }
 
@@ -158,10 +191,13 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
       const spend = data.monthlySpendUsd ?? 0;
+      const billingAccess = data.billingAccess !== false;
       setOpenaiRow((prev) => ({
         ...prev,
         status: "done",
-        msg: spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected",
+        msg: !billingAccess
+          ? `Key valid but no billing access — ${data.verifyError ?? "check key permissions"}`
+          : spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected ($0 spend this month)",
         adminKey: "",
         openaiProjectId: "",
         open: false,
@@ -199,6 +235,52 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
           {successBanner}
         </div>
       )}
+
+      {/* .env drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setEnvDragOver(true); }}
+        onDragLeave={() => setEnvDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setEnvDragOver(false);
+          const file = e.dataTransfer.files[0];
+          if (file) handleEnvFile(file);
+        }}
+        style={{
+          marginBottom: 16,
+          padding: "14px 16px",
+          borderRadius: 10,
+          border: `1.5px dashed ${envDragOver ? "var(--accent)" : envStatus === "done" ? "var(--good)" : "var(--border)"}`,
+          background: envDragOver ? "var(--accent-bg, rgba(99,102,241,0.06))" : "var(--panel-2)",
+          textAlign: "center",
+          transition: "border-color 0.15s, background 0.15s",
+          cursor: "pointer",
+          position: "relative",
+        }}
+        onClick={() => {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.accept = ".env,.txt";
+          input.onchange = (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) handleEnvFile(file);
+          };
+          input.click();
+        }}
+      >
+        {envStatus === "loading" ? (
+          <p className="muted small">Scanning for vendor keys…</p>
+        ) : envStatus === "done" ? (
+          <p className="small" style={{ color: "var(--good)", fontWeight: 500 }}>{envMsg}</p>
+        ) : envStatus === "error" ? (
+          <p className="small" style={{ color: "var(--danger)" }}>{envMsg}</p>
+        ) : (
+          <>
+            <p className="small" style={{ fontWeight: 500, marginBottom: 2 }}>Drop your .env file here</p>
+            <p className="muted small">Gauge detects OpenAI, Anthropic, Stripe, Twilio, SendGrid keys automatically</p>
+          </>
+        )}
+      </div>
 
       {/* OAuth section */}
       <div style={{ marginBottom: 16 }}>
