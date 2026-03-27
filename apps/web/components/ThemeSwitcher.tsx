@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 const THEMES = [
-  { id: "gauge",    label: "Cloud",  colors: ["#2563eb", "#0ea47a"] },
-  { id: "terminal", label: "Slate",  colors: ["#6366f1", "#06b6d4"] },
-  { id: "obsidian", label: "Warm",   colors: ["#0d9488", "#d97706"] },
+  { id: "gauge",    label: "Sand",  colors: ["#2563eb", "#0ea47a"] },
+  { id: "terminal", label: "Slate", colors: ["#6366f1", "#06b6d4"] },
+  { id: "obsidian", label: "Warm",  colors: ["#0d9488", "#d97706"] },
 ] as const;
 
 type ThemeId = (typeof THEMES)[number]["id"];
