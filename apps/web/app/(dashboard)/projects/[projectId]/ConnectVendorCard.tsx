@@ -148,6 +148,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
           open: !billingAccess,
         });
         router.refresh();
+        fetchConnections();
       } else {
         updateManual(vendorId, { status: "error", msg: "Invalid key or key rejected by vendor" });
       }
@@ -491,6 +492,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
           {/* AWS — two-input flow */}
           {(() => {
             const isConnected = connected.includes("aws") || awsRow.status === "done";
+
             return (
               <div
                 style={{
@@ -580,12 +582,13 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
           {/* Other manual vendors */}
           {MANUAL_VENDORS.map((vendor) => {
             const row = manualRows[vendor.id];
+            const isConnected = connected.includes(vendor.id) || row.status === "done";
             return (
               <div
                 key={vendor.id}
                 style={{
                   borderRadius: 10,
-                  border: `1px solid ${row.status === "done" ? "var(--good)" : "var(--border)"}`,
+                  border: `1px solid ${isConnected ? "var(--good)" : "var(--border)"}`,
                   overflow: "hidden",
                 }}
               >
@@ -603,8 +606,10 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
                 >
                   <span className="small" style={{ fontWeight: 500 }}>{vendor.name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {row.status === "done" && (
-                      <span style={{ fontSize: 11, color: "var(--good)" }}>{row.msg}</span>
+                    {isConnected && row.status !== "error" && (
+                      <span style={{ fontSize: 11, color: "var(--good)" }}>
+                        {row.status === "done" ? row.msg : "Connected"}
+                      </span>
                     )}
                     {row.status === "error" && (
                       <span style={{ fontSize: 11, color: "var(--danger)" }}>Error</span>
