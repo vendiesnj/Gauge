@@ -17,6 +17,7 @@
     "@api-spend/scanner": "workspace:*",
     "@api-spend/shared": "workspace:*",
     "@auth/prisma-adapter": "^2.11.1",
+    "@aws-sdk/client-cost-explorer": "^3.1018.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "clsx": "^2.1.1",

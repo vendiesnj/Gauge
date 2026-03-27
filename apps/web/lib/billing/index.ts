@@ -3,6 +3,8 @@
  * Keys are used transiently — never stored, discarded after query.
  */
 
+import { CostExplorerClient, GetCostAndUsageCommand } from "@aws-sdk/client-cost-explorer";
+
 export type BillingResult = {
   vendorId: string;
   planName: string;
@@ -29,11 +31,8 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
       `https://api.openai.com/v1/organization/costs?start_time=${startOfMonth}&bucket_width=1d&limit=31`,
       { headers }
     );
-    console.log("[openai billing] costs status:", costsRes.status);
-
     if (costsRes.ok) {
       const data = await costsRes.json();
-      console.log("[openai billing] costs body:", JSON.stringify(data).slice(0, 500));
       let totalCost = 0;
       for (const bucket of data.data ?? []) {
         for (const result of bucket.results ?? []) {
@@ -48,9 +47,6 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
       // Key is valid but lacks billing permission — fall back to usage API
     } else if (costsRes.status === 401) {
       return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
-    } else {
-      const errText = await costsRes.text();
-      console.log("[openai billing] costs error:", errText.slice(0, 300));
     }
 
     // Costs API failed — fall back to usage API with per-model pricing
@@ -58,7 +54,6 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
       `https://api.openai.com/v1/organization/usage/completions?start_time=${startOfMonth}&limit=100`,
       { headers }
     );
-    console.log("[openai billing] usage status:", usageRes.status);
 
     if (usageRes.ok) {
       const data = await usageRes.json();
@@ -393,6 +388,56 @@ export async function fetchVercelBilling(
   }
 }
 
+// ─── AWS ──────────────────────────────────────────────────────────────────────
+// key format: "AKIAXXX:secretAccessKey"
+export async function fetchAWS(key: string): Promise<BillingResult | null> {
+  try {
+    const [accessKeyId, secretAccessKey] = key.split(":");
+    if (!accessKeyId || !secretAccessKey) return null;
+
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const endDate = now.toISOString().split("T")[0];
+    // Cost Explorer requires start != end; if same day use next day
+    const endDateSafe = endDate === startDate
+      ? new Date(now.getTime() + 86400000).toISOString().split("T")[0]
+      : endDate;
+
+    const client = new CostExplorerClient({
+      region: "us-east-1",
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    const response = await client.send(new GetCostAndUsageCommand({
+      TimePeriod: { Start: startDate, End: endDateSafe },
+      Granularity: "MONTHLY",
+      Metrics: ["UnblendedCost"],
+    }));
+
+    const amount = parseFloat(
+      response.ResultsByTime?.[0]?.Total?.UnblendedCost?.Amount ?? "0"
+    );
+
+    return {
+      vendorId: "aws",
+      planName: "AWS Pay-as-you-go",
+      monthlySpendUsd: Math.round(amount * 100) / 100,
+      source: "billing_api",
+      keyValid: true,
+      billingAccess: true,
+    };
+  } catch (err: unknown) {
+    const name = err instanceof Error ? err.name : "";
+    if (name === "InvalidClientTokenId" || name === "InvalidSignatureException") {
+      return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid credentials" };
+    }
+    if (name === "AccessDeniedException") {
+      return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks Cost Explorer access — attach the CostExplorerReadOnlyAccess policy" };
+    }
+    return null;
+  }
+}
+
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 const BILLING_FETCHERS: Record<string, (key: string) => Promise<BillingResult | null>> = {
@@ -401,6 +446,7 @@ const BILLING_FETCHERS: Record<string, (key: string) => Promise<BillingResult | 
   stripe:    fetchStripe,
   twilio:    fetchTwilio,
   sendgrid:  fetchSendGrid,
+  aws:       fetchAWS,
 };
 
 export async function fetchBillingForKeys(

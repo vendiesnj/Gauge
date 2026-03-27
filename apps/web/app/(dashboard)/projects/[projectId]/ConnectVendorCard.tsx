@@ -12,9 +12,9 @@ const MANUAL_VENDORS = [
     id: "anthropic",
     name: "Anthropic",
     placeholder: "sk-ant-…",
-    hint: "Any API key works — Anthropic grants usage access automatically.",
+    hint: "Needs an API key with usage:read scope — create one in your Anthropic console.",
     helpUrl: "https://console.anthropic.com/settings/keys",
-    helpLabel: "Get API key →",
+    helpLabel: "Create API key →",
   },
   {
     id: "twilio",
@@ -43,6 +43,14 @@ interface OpenAIRowState {
   open: boolean;
 }
 
+interface AWSRowState {
+  accessKeyId: string;
+  secretKey: string;
+  status: Status;
+  msg: string;
+  open: boolean;
+}
+
 export function ConnectVendorCard({ projectId }: { projectId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,6 +72,14 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
   const [openaiRow, setOpenaiRow] = useState<OpenAIRowState>({
     openaiProjectId: "",
     adminKey: "",
+    status: "idle",
+    msg: "",
+    open: false,
+  });
+
+  const [awsRow, setAwsRow] = useState<AWSRowState>({
+    accessKeyId: "",
+    secretKey: "",
     status: "idle",
     msg: "",
     open: false,
@@ -193,6 +209,44 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
       router.refresh();
     } catch (err) {
       setOpenaiRow((prev) => ({
+        ...prev,
+        status: "error",
+        msg: err instanceof Error ? err.message : "Failed",
+      }));
+    }
+  }
+
+  async function connectAWS() {
+    if (!awsRow.accessKeyId.trim() || !awsRow.secretKey.trim()) return;
+    setAwsRow((prev) => ({ ...prev, status: "loading", msg: "" }));
+    try {
+      const res = await fetch("/api/connect/aws", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          accessKeyId: awsRow.accessKeyId.trim(),
+          secretKey: awsRow.secretKey.trim(),
+          gaugeProjectId: projectId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      const spend = data.monthlySpendUsd ?? 0;
+      const billingAccess = data.billingAccess !== false;
+      setAwsRow((prev) => ({
+        ...prev,
+        status: "done",
+        msg: !billingAccess
+          ? `Key valid but no billing access — ${data.verifyError ?? "attach CostExplorerReadOnlyAccess policy"}`
+          : spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected ($0 spend this month)",
+        accessKeyId: "",
+        secretKey: "",
+        open: false,
+      }));
+      setConnected((prev) => [...prev.filter((v) => v !== "aws"), "aws"]);
+      router.refresh();
+    } catch (err) {
+      setAwsRow((prev) => ({
         ...prev,
         status: "error",
         msg: err instanceof Error ? err.message : "Failed",
@@ -419,6 +473,95 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
                     </div>
                     {openaiRow.status === "error" && (
                       <p style={{ fontSize: 11, color: "var(--danger)", marginTop: 6 }}>{openaiRow.msg}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* AWS — two-input flow */}
+          {(() => {
+            const isConnected = connected.includes("aws") || awsRow.status === "done";
+            return (
+              <div
+                style={{
+                  borderRadius: 10,
+                  border: `1px solid ${isConnected ? "var(--good)" : "var(--border)"}`,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    background: "var(--panel-2)",
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                  onClick={() => setAwsRow((prev) => ({ ...prev, open: !prev.open }))}
+                >
+                  <span className="small" style={{ fontWeight: 500 }}>AWS</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {isConnected && (
+                      <span style={{ fontSize: 11, color: "var(--good)" }}>Connected</span>
+                    )}
+                    {awsRow.status === "error" && (
+                      <span style={{ fontSize: 11, color: "var(--danger)" }}>Error</span>
+                    )}
+                    <svg
+                      width="12" height="12" viewBox="0 0 24 24" fill="none"
+                      stroke="var(--muted)" strokeWidth="2.5"
+                      style={{ transform: awsRow.open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                </div>
+                {awsRow.open && (
+                  <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
+                    <p className="muted" style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 10 }}>
+                      Create an IAM user with <strong>CostExplorerReadOnlyAccess</strong> policy and paste the access key here.{" "}
+                      <a href="https://console.aws.amazon.com/iam/home#/users" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+                        IAM console →
+                      </a>
+                    </p>
+                    <div className="stack gap-8">
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Access Key ID (AKIA…)"
+                        value={awsRow.accessKeyId}
+                        onChange={(e) => setAwsRow((prev) => ({ ...prev, accessKeyId: e.target.value, status: "idle", msg: "" }))}
+                        style={{ fontSize: 13 }}
+                        autoComplete="off"
+                        disabled={awsRow.status === "loading"}
+                      />
+                      <div className="row gap-8">
+                        <input
+                          type="password"
+                          className="input"
+                          placeholder="Secret Access Key"
+                          value={awsRow.secretKey}
+                          onChange={(e) => setAwsRow((prev) => ({ ...prev, secretKey: e.target.value, status: "idle", msg: "" }))}
+                          onKeyDown={(e) => e.key === "Enter" && connectAWS()}
+                          style={{ flex: 1, fontSize: 13 }}
+                          autoComplete="off"
+                          disabled={awsRow.status === "loading"}
+                        />
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={connectAWS}
+                          disabled={awsRow.status === "loading" || !awsRow.accessKeyId.trim() || !awsRow.secretKey.trim()}
+                        >
+                          {awsRow.status === "loading" ? "Connecting…" : "Connect"}
+                        </button>
+                      </div>
+                    </div>
+                    {awsRow.status === "error" && (
+                      <p style={{ fontSize: 11, color: "var(--danger)", marginTop: 6 }}>{awsRow.msg}</p>
                     )}
                   </div>
                 )}

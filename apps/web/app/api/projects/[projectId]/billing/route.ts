@@ -62,7 +62,6 @@ export async function POST(
 
   // Direct vendor key connection: { vendorId, apiKey }
   if (body.vendorId && body.apiKey && typeof body.apiKey === "string" && body.apiKey.length > 8) {
-    console.log("[billing] direct key connect:", body.vendorId, "keyLen:", body.apiKey.length);
     rawKeys = [{ vendorId: body.vendorId, value: body.apiKey }];
   } else if (body.envContent && typeof body.envContent === "string") {
     // .env file upload: parse key=value pairs and match to vendors
