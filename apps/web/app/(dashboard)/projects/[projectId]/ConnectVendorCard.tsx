@@ -12,9 +12,9 @@ const MANUAL_VENDORS = [
     id: "anthropic",
     name: "Anthropic",
     placeholder: "sk-ant-…",
-    hint: "Needs an API key with usage:read scope — create one in your Anthropic console.",
-    helpUrl: "https://console.anthropic.com/settings/keys",
-    helpLabel: "Create API key →",
+    hint: "Requires an Admin API key (not a regular API key) — create one under Organization settings.",
+    helpUrl: "https://console.anthropic.com/settings/admin-keys",
+    helpLabel: "Create Admin API key →",
   },
   {
     id: "twilio",
@@ -132,12 +132,12 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
         const spend = data.monthlySpendUsd ?? 0;
         const billingAccess = data.billingAccess !== false;
         updateManual(vendorId, {
-          status: "done",
+          status: billingAccess ? "done" : "error",
           msg: !billingAccess
             ? `Key valid but no billing access — ${data.verifyError ?? "check key permissions"}`
             : spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected ($0 spend this month)",
           key: "",
-          open: false,
+          open: !billingAccess,
         });
         router.refresh();
       } else {
@@ -197,13 +197,13 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
       const billingAccess = data.billingAccess !== false;
       setOpenaiRow((prev) => ({
         ...prev,
-        status: "done",
+        status: billingAccess ? "done" : "error",
         msg: !billingAccess
           ? `Key valid but no billing access — ${data.verifyError ?? "check key permissions"}`
           : spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected ($0 spend this month)",
         adminKey: "",
         openaiProjectId: "",
-        open: false,
+        open: !billingAccess,
       }));
       setConnected((prev) => [...prev.filter((v) => v !== "openai"), "openai"]);
       router.refresh();
@@ -235,13 +235,13 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
       const billingAccess = data.billingAccess !== false;
       setAwsRow((prev) => ({
         ...prev,
-        status: "done",
+        status: billingAccess ? "done" : "error",
         msg: !billingAccess
           ? `Key valid but no billing access — ${data.verifyError ?? "attach CostExplorerReadOnlyAccess policy"}`
           : spend > 0 ? `Connected — $${spend.toFixed(2)}/mo` : "Connected ($0 spend this month)",
         accessKeyId: "",
         secretKey: "",
-        open: false,
+        open: !billingAccess,
       }));
       setConnected((prev) => [...prev.filter((v) => v !== "aws"), "aws"]);
       router.refresh();
