@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { VENDOR_MAP } from "@api-spend/shared";
 import type { VendorCostInsight } from "@api-spend/shared";
 import { SpendTable, PUBLISHED_RATES, calcCost } from "./SpendTable";
@@ -69,8 +69,34 @@ function fmt(n: number) {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
+const STORAGE_KEY = (projectId: string) => `gauge-calculator-${projectId}`;
+
 export function SpendDashboard({ projectId, insights, plans, vendorCount, notes }: SpendDashboardProps) {
   const [inputs, setInputs] = useState<Record<string, string>>({});
+
+  // Restore saved inputs on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY(projectId));
+      if (saved) setInputs(JSON.parse(saved));
+    } catch {}
+  }, [projectId]);
+
+  // Persist inputs whenever they change
+  useEffect(() => {
+    try {
+      if (Object.keys(inputs).length > 0) {
+        localStorage.setItem(STORAGE_KEY(projectId), JSON.stringify(inputs));
+      } else {
+        localStorage.removeItem(STORAGE_KEY(projectId));
+      }
+    } catch {}
+  }, [inputs, projectId]);
+
+  function clearInputs() {
+    setInputs({});
+    try { localStorage.removeItem(STORAGE_KEY(projectId)); } catch {}
+  }
 
   const { liveSpend, liveAlt, liveUnused, anyInput } = computeLiveTotals(insights, inputs);
   const liveSavings = Math.max(0, liveSpend - liveAlt);
@@ -121,7 +147,14 @@ export function SpendDashboard({ projectId, insights, plans, vendorCount, notes 
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
             <div className="heading-sm">Spend & recommendations</div>
-            <RecalculateButton projectId={projectId} />
+            <div className="row" style={{ gap: 8 }}>
+              {anyInput && (
+                <button className="btn btn-secondary btn-sm" onClick={clearInputs}>
+                  Clear estimates
+                </button>
+              )}
+              <RecalculateButton projectId={projectId} />
+            </div>
           </div>
           <SpendTable
             insights={insights}

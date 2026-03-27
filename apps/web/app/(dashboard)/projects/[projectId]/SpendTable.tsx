@@ -289,6 +289,11 @@ function SpendRow({
                   {insight.estimatedUnusedSpendUsd > 0 && (
                     <Row label="Unused capacity" value={`${formatMoney(insight.estimatedUnusedSpendUsd)} wasted`} warn />
                   )}
+                  {!hasSpend && !hasUsage && inputQty === 0 && (
+                    <div style={{ fontSize: 11, color: "var(--muted)", padding: "8px 10px", borderRadius: 6, background: "var(--bg)", border: "1px dashed var(--border)", marginTop: 4, lineHeight: 1.6 }}>
+                      No billing data synced yet. Enter your monthly {rate?.unitLabel ?? "usage"} in the cost calculator to see an estimate.
+                    </div>
+                  )}
                 </div>
               </div>
 

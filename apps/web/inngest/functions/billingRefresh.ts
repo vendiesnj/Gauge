@@ -54,6 +54,14 @@ export const dailyBillingRefresh = inngest.createFunction(
 
         if (!result) return;
 
+        // Derive effective rate (spend / usage) for benchmarking — only when both are real numbers
+        const effectiveRateUsd =
+          result.monthlySpendUsd != null &&
+          result.usageIncluded != null &&
+          result.usageIncluded > 0
+            ? result.monthlySpendUsd / result.usageIncluded
+            : undefined;
+
         // Update VendorPlan for every project in this org that has this vendor
         for (const project of conn.org.projects) {
           await db.vendorPlan.upsert({
@@ -61,6 +69,8 @@ export const dailyBillingRefresh = inngest.createFunction(
             update: {
               planName: result.planName,
               monthlySpendUsd: result.monthlySpendUsd,
+              usageIncluded: result.usageIncluded,
+              effectiveRateUsd,
               source: "billing_api",
             },
             create: {
@@ -68,6 +78,8 @@ export const dailyBillingRefresh = inngest.createFunction(
               vendorId: conn.vendorId,
               planName: result.planName,
               monthlySpendUsd: result.monthlySpendUsd,
+              usageIncluded: result.usageIncluded,
+              effectiveRateUsd,
               source: "billing_api",
             },
           });

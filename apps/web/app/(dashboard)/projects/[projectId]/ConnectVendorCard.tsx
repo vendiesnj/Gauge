@@ -3,6 +3,46 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+const SETUP_STEPS: Record<string, string[]> = {
+  openai: [
+    "Go to platform.openai.com → Settings → Projects and copy your Project ID (starts with proj_)",
+    "Go to Settings → API Keys → Create new secret key — set Role to All",
+    "Paste the Project ID and admin key below",
+  ],
+  aws: [
+    "Go to AWS Console → IAM → Users → Create user",
+    "Attach the CostExplorerReadOnlyAccess policy directly",
+    "Open the user → Security Credentials → Create access key → Application running outside AWS",
+    "Copy the Access Key ID and Secret Access Key below",
+  ],
+  anthropic: [
+    "Go to console.anthropic.com → Settings → Admin Keys",
+    "Click Create Admin Key (requires Organization Owner role)",
+    "Copy the key (starts with sk-ant-admin-) and paste below",
+  ],
+  resend: [
+    "Go to resend.com → API Keys",
+    "Click Add API Key — set permission to Full access",
+    "Copy the key (starts with re_) and paste below",
+  ],
+  twilio: [
+    "Go to console.twilio.com — your Account SID and Auth Token are on the homepage",
+    "Paste as AccountSID:AuthToken with a colon separating them (no spaces)",
+  ],
+};
+
+function SetupSteps({ vendorId }: { vendorId: string }) {
+  const steps = SETUP_STEPS[vendorId];
+  if (!steps) return null;
+  return (
+    <ol style={{ margin: "0 0 10px", padding: "0 0 0 16px" }}>
+      {steps.map((step, i) => (
+        <li key={i} style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, marginBottom: 3 }}>{step}</li>
+      ))}
+    </ol>
+  );
+}
+
 const OAUTH_VENDORS = [
   { id: "stripe", name: "Stripe" },
 ] as const;
@@ -435,19 +475,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
                 </div>
                 {openaiRow.open && (
                   <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
-                    <p className="muted" style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 10 }}>
-                      Gauge needs your OpenAI Project ID and an admin API key to read usage data. The key is stored encrypted and used for daily billing refreshes.{" "}
-                      <a href="https://platform.openai.com/settings/organization/projects" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
-                        Find Project ID →
-                      </a>
-                      {" · "}
-                      <a href="https://platform.openai.com/settings/organization/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
-                        Create admin key →
-                      </a>
-                      {" (set Role to "}
-                      <strong>All</strong>
-                      {" when creating)"}
-                    </p>
+                    <SetupSteps vendorId="openai" />
                     <div className="stack gap-8">
                       <input
                         type="text"
@@ -532,12 +560,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
                 </div>
                 {awsRow.open && (
                   <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
-                    <p className="muted" style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 10 }}>
-                      Create an IAM user with <strong>CostExplorerReadOnlyAccess</strong> policy and paste the access key here.{" "}
-                      <a href="https://console.aws.amazon.com/iam/home#/users" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
-                        IAM console →
-                      </a>
-                    </p>
+                    <SetupSteps vendorId="aws" />
                     <div className="stack gap-8">
                       <input
                         type="text"
@@ -625,12 +648,7 @@ export function ConnectVendorCard({ projectId }: { projectId: string }) {
                 </div>
                 {row.open && (
                   <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", background: "var(--bg2)" }}>
-                    <p className="muted" style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 10 }}>
-                      {vendor.hint}{" "}
-                      <a href={vendor.helpUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
-                        {vendor.helpLabel}
-                      </a>
-                    </p>
+                    <SetupSteps vendorId={vendor.id} />
                     <div className="row gap-8">
                       <input
                         type="password"

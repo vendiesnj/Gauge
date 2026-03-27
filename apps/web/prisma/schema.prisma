@@ -178,6 +178,7 @@ model VendorPlan {
   monthlyCommitUsd Float?
   usageIncluded    Float?
   unit             String?
+  effectiveRateUsd Float?   // derived: monthlySpendUsd / usageIncluded — used for benchmarking
   source           String   @default("manual") // "manual" | "billing_api" | "invoice"
   billingPeriodStart DateTime?
   billingPeriodEnd   DateTime?
@@ -318,6 +319,7 @@ model VendorConnection {
   refreshToken     String?  @db.Text
   tokenExpiresAt   DateTime?
   encryptedAdminKey String? @db.Text  // AES-256-GCM encrypted admin/billing key for scheduled refresh
+  benchmarkOptIn   Boolean  @default(false) // user consented to contribute anonymized rates to benchmarks
   metadata         Json?    // vendor-specific: stripeAccountId, teamId, openaiProjectId, etc.
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

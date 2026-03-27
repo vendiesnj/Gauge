@@ -113,6 +113,33 @@ const VENDOR_GROUPS = [
 ];
 
 
+const FEATURES = [
+  {
+    icon: "📡",
+    title: "Alerts when vendors reprice",
+    body: "Gauge checks vendor pricing pages daily. When OpenAI, Twilio, or Stripe changes a rate, you get an email before it shows up on your bill.",
+    badge: null,
+  },
+  {
+    icon: "📊",
+    title: "Direct from vendor APIs",
+    body: "We pull usage and spend straight from each vendor's billing API — not inferred from your bank statement. Real token counts, SMS volumes, and dollar amounts.",
+    badge: null,
+  },
+  {
+    icon: "🗳️",
+    title: "Built around actual demand",
+    body: "Vote on which vendors to support next. Every integration we ship is driven by what developers are actually using — not what looks good on a feature list.",
+    badge: null,
+  },
+  {
+    icon: "📈",
+    title: "Rate benchmarks",
+    body: "See how your effective rate compares to teams your size. Know when you're paying above median — and when you've grown large enough to negotiate enterprise pricing.",
+    badge: "Coming soon",
+  },
+];
+
 const KPI_ROWS = [
   { label: "Monthly spend",   value: "$1,240", sub: "3 vendors tracked" },
   { label: "Wasted spend",    value: "$94",    sub: "Unused capacity" },
@@ -142,11 +169,16 @@ export default function LandingPage() {
   const [reqStatus,   setReqStatus]   = useState<"idle" | "loading" | "done" | "error">("idle");
   const [reqMsg,      setReqMsg]      = useState("");
   const [counts,      setCounts]      = useState<Record<string, number>>({});
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/vendor-requests")
       .then(r => r.json())
       .then(setCounts)
+      .catch(() => {});
+    fetch("/api/stats")
+      .then(r => r.json())
+      .then((d: { waitlistCount: number }) => setWaitlistCount(d.waitlistCount))
       .catch(() => {});
   }, []);
 
@@ -205,6 +237,20 @@ export default function LandingPage() {
 
   return (
     <div className="retro-desktop">
+      <style>{`
+        @media (max-width: 768px) {
+          .retro-hero-grid { grid-template-columns: 1fr !important; gap: 32px !important; padding: 40px 0 24px !important; }
+          .retro-window-col { display: none !important; }
+          .retro-how-grid { grid-template-columns: 1fr 1fr !important; }
+          @media (max-width: 480px) { .retro-how-grid { grid-template-columns: 1fr !important; } }
+          .retro-menubar { padding: 0 16px !important; }
+          .retro-menubar .retro-menubar-item { display: none !important; }
+          .container { padding: 0 16px !important; }
+          h1 { font-size: 36px !important; }
+          .retro-desktop { padding-bottom: 60px; }
+          .vendor-pill-grid { gap: 6px !important; }
+        }
+      `}</style>
 
       {/* ── Menu bar ── */}
       <nav className="retro-menubar">
@@ -246,7 +292,7 @@ export default function LandingPage() {
                 fontSize: 11.5, fontWeight: 600, color: "#5a4530",
                 marginBottom: 22, backdropFilter: "blur(6px)",
               }}>
-                🔒 Private beta — join the waitlist
+                🔒 Private beta{waitlistCount ? ` · ${waitlistCount.toLocaleString()} on the list` : " — join the waitlist"}
               </div>
 
               <h1 style={{
@@ -262,8 +308,8 @@ export default function LandingPage() {
               </h1>
 
               <p style={{ fontSize: 17, lineHeight: 1.7, marginBottom: 32, color: "var(--muted)" }}>
-                Connect OpenAI, Stripe, Twilio, and AWS. Gauge pulls real billing data,
-                spots wasted spend, and shows you what switching vendors would actually save.
+                Connect your vendors and Gauge pulls real billing data directly from their APIs —
+                spots wasted spend, and shows you what switching would actually save.
               </p>
 
               {status === "done" ? (
@@ -312,15 +358,23 @@ export default function LandingPage() {
               </p>
 
               {/* Vendor pill badges */}
-              <div style={{ display: "flex", gap: 8, marginTop: 44, flexWrap: "wrap" }}>
-                {["OpenAI", "Stripe", "Twilio", "AWS", "Anthropic"].map(v => (
-                  <span key={v} style={{
-                    padding: "5px 13px", borderRadius: 999,
-                    background: "var(--panel)", border: "1px solid var(--border)",
-                    fontSize: 12.5, fontWeight: 600, color: "var(--text)",
-                    backdropFilter: "blur(4px)",
-                  }}>{v}</span>
-                ))}
+              <div style={{ marginTop: 44 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#8a7255", marginBottom: 10 }}>
+                  Live billing API · auto-connect
+                </p>
+                <div className="vendor-pill-grid" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  {["OpenAI", "Anthropic", "Stripe", "Twilio", "AWS", "Resend"].map(v => (
+                    <span key={v} style={{
+                      padding: "5px 13px", borderRadius: 999,
+                      background: "var(--panel)", border: "1px solid var(--border)",
+                      fontSize: 12.5, fontWeight: 600, color: "var(--text)",
+                      backdropFilter: "blur(4px)",
+                    }}>{v}</span>
+                  ))}
+                </div>
+                <p style={{ fontSize: 11, color: "#8a7255", lineHeight: 1.6 }}>
+                  + usage calculator for any vendor · more auto-connect coming soon
+                </p>
               </div>
             </div>
 
@@ -470,11 +524,11 @@ export default function LandingPage() {
           </div>
 
           {/* How it works */}
-          <div style={{ padding: "20px 0 80px" }}>
+          <div style={{ padding: "20px 0 60px" }}>
             <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 28, letterSpacing: "-0.02em", color: "var(--text)" }}>
               How it works
             </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+            <div className="retro-how-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
               {HOW_IT_WORKS.map(f => (
                 <div key={f.step} style={{
                   background: "var(--panel)", border: "1px solid var(--border)",
@@ -487,6 +541,38 @@ export default function LandingPage() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     color: "#fff", fontWeight: 800, fontSize: 13, marginBottom: 14,
                   }}>{f.step}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>{f.title}</div>
+                  <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.65 }}>{f.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* What makes Gauge different */}
+          <div style={{ padding: "0 0 80px" }}>
+            <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8, letterSpacing: "-0.02em", color: "var(--text)" }}>
+              What makes Gauge different
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--muted)", marginBottom: 28, lineHeight: 1.6 }}>
+              Not another dashboard. Not estimates. Real data, automated alerts, and built around what developers actually need.
+            </p>
+            <div className="retro-how-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
+              {FEATURES.map(f => (
+                <div key={f.title} style={{
+                  background: "var(--panel)", border: `1px solid ${f.badge ? "rgba(26,86,219,0.2)" : "var(--border)"}`,
+                  borderRadius: 14, padding: "22px 20px", backdropFilter: "blur(6px)",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                  position: "relative",
+                }}>
+                  {f.badge && (
+                    <span style={{
+                      position: "absolute", top: 14, right: 14,
+                      fontSize: 10, fontWeight: 700, padding: "2px 8px",
+                      borderRadius: 999, background: "rgba(26,86,219,0.1)",
+                      color: "#1a56db", textTransform: "uppercase", letterSpacing: "0.05em",
+                    }}>{f.badge}</span>
+                  )}
+                  <div style={{ fontSize: 24, marginBottom: 12 }}>{f.icon}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>{f.title}</div>
                   <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.65 }}>{f.body}</p>
                 </div>

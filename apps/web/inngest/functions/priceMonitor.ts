@@ -1,6 +1,7 @@
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import { MONITORED_RATES, fetchCurrentRate } from "@/lib/pricing/monitor";
+import { Resend } from "resend";
 
 /**
  * Daily cron — fetches vendor pricing pages via Jina Reader, compares to
@@ -89,6 +90,38 @@ export const dailyPriceMonitor = inngest.createFunction(
           ]);
 
           results.push({ vendorId: rate.vendorId, tierName: rate.tierName, status: "changed", oldPrice: storedPrice, newPrice: currentPrice });
+
+          // Email affected users
+          if (process.env.RESEND_API_KEY) {
+            const connections = await db.vendorConnection.findMany({
+              where: { vendorId: rate.vendorId },
+              include: {
+                org: {
+                  include: {
+                    memberships: { include: { user: { select: { email: true } } } },
+                  },
+                },
+              },
+            });
+            const emails = [
+              ...new Set(
+                connections
+                  .flatMap((c) => c.org.memberships.map((m) => m.user.email))
+                  .filter((e): e is string => Boolean(e))
+              ),
+            ];
+            if (emails.length > 0) {
+              const pctChange = Math.round(Math.abs(currentPrice - storedPrice) / storedPrice * 100);
+              const direction = currentPrice > storedPrice ? "increased" : "decreased";
+              const resend = new Resend(process.env.RESEND_API_KEY);
+              await resend.emails.send({
+                from: "Gauge Alerts <adam@getgauge.dev>",
+                to: emails,
+                subject: `${rate.vendorId} pricing ${direction} ${pctChange}%`,
+                html: `<p>Hi,</p><p>Gauge detected a pricing change for <strong>${rate.vendorId}</strong> (${rate.tierName}):</p><p><strong>${storedPrice}</strong> → <strong>${currentPrice}</strong> per ${rate.unit} (${direction} ${pctChange}%)</p><p>Log in to <a href="https://getgauge.dev">Gauge</a> to review your updated spend estimates.</p><p>— Adam at Gauge</p>`,
+              }).catch(() => {});
+            }
+          }
         } else {
           // Same — just update lastVerifiedAt
           await db.vendorPricingTier.update({
