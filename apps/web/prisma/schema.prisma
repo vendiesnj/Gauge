@@ -274,6 +274,21 @@ model SpendSnapshot {
   @@index([projectId, monthYear])
 }
 
+// ─── Price Change Log ─────────────────────────────────────────────────────────
+// Written when a monitored vendor rate differs from the previously stored value.
+model PriceChangeLog {
+  id          String   @id @default(cuid())
+  vendorId    String
+  tierName    String   // e.g. "gpt-4o-input", "sms-outbound"
+  oldPrice    Float
+  newPrice    Float
+  unit        String   // e.g. "per 1M tokens", "per SMS"
+  sourceUrl   String
+  detectedAt  DateTime @default(now())
+
+  @@index([vendorId, detectedAt])
+}
+
 // ─── Vendor Billing API Requests ──────────────────────────────────────────────
 // Tracks demand for vendor billing integrations from the landing page.
 model VendorRequest {
