@@ -141,15 +141,17 @@ const FEATURES = [
 ];
 
 const KPI_ROWS = [
-  { label: "Monthly spend",   value: "$1,240", sub: "3 vendors tracked" },
-  { label: "Wasted spend",    value: "$94",    sub: "Unused capacity" },
-  { label: "Switch & save",   value: "$186/mo", sub: "OpenAI → Anthropic" },
+  { label: "Monthly spend",  value: "$1,242", sub: "5 vendors tracked" },
+  { label: "Wasted spend",   value: "$72",    sub: "Unused Twilio capacity" },
+  { label: "Switch & save",  value: "$437/mo", sub: "OpenAI → Groq" },
 ];
 
 const TABLE_ROWS = [
-  { vendor: "OpenAI",    monthly: "$780", usage: "4.2M tokens",  wasted: "$0",  alt: "Anthropic",  savings: "~24%" },
-  { vendor: "Twilio",    monthly: "$318", usage: "9,400 SMS",    wasted: "$94", alt: "—",           savings: "—"   },
-  { vendor: "Stripe",    monthly: "$142", usage: "$47k vol.",     wasted: "$0",  alt: "—",           savings: "—"   },
+  { vendor: "OpenAI",  monthly: "$480", usage: "192M tokens",  wasted: "$0",  alt: "Groq",     savings: "~89%" },
+  { vendor: "Twilio",  monthly: "$280", usage: "35,400 SMS",   wasted: "$72", alt: "Vonage",   savings: "~20%" },
+  { vendor: "Stripe",  monthly: "$186", usage: "$64k vol.",     wasted: "$0",  alt: "—",        savings: "—"    },
+  { vendor: "Resend",  monthly: "$68",  usage: "68k emails",   wasted: "$0",  alt: "SendGrid", savings: "~40%" },
+  { vendor: "AWS",     monthly: "$228", usage: "pay-per-use",  wasted: "$0",  alt: "—",        savings: "—"    },
 ];
 
 const HOW_IT_WORKS = [
