@@ -102,15 +102,11 @@ export async function POST(
       const rawKey = rawKeys.find((k) => k.vendorId === result.vendorId);
       if (rawKey) {
         const encryptedAdminKey = process.env.ENCRYPTION_KEY ? encrypt(rawKey.value) : null;
-        try {
-          await db.vendorConnection.upsert({
-            where: { orgId_vendorId: { orgId: project.orgId, vendorId: result.vendorId } },
-            update: { accessToken: "manual", encryptedAdminKey },
-            create: { orgId: project.orgId, vendorId: result.vendorId, accessToken: "manual", encryptedAdminKey },
-          });
-        } catch {
-          // Connection marker failed — billing data still saved
-        }
+        await db.vendorConnection.upsert({
+          where: { orgId_vendorId: { orgId: project.orgId, vendorId: result.vendorId } },
+          update: { accessToken: "manual", encryptedAdminKey },
+          create: { orgId: project.orgId, vendorId: result.vendorId, accessToken: "manual", encryptedAdminKey },
+        });
       }
     }
 
