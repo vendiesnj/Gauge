@@ -97,22 +97,19 @@ export async function POST(
         },
       });
 
-      // Store encrypted key on VendorConnection so the daily refresh job can use it
+      // Always save VendorConnection so connection status persists across refreshes.
+      // Encrypt the key if ENCRYPTION_KEY is set (enables daily auto-refresh).
       const rawKey = rawKeys.find((k) => k.vendorId === result.vendorId);
-      if (rawKey && process.env.ENCRYPTION_KEY) {
+      if (rawKey) {
+        const encryptedAdminKey = process.env.ENCRYPTION_KEY ? encrypt(rawKey.value) : null;
         try {
           await db.vendorConnection.upsert({
             where: { orgId_vendorId: { orgId: project.orgId, vendorId: result.vendorId } },
-            update: { accessToken: "manual", encryptedAdminKey: encrypt(rawKey.value) },
-            create: {
-              orgId: project.orgId,
-              vendorId: result.vendorId,
-              accessToken: "manual",
-              encryptedAdminKey: encrypt(rawKey.value),
-            },
+            update: { accessToken: "manual", encryptedAdminKey },
+            create: { orgId: project.orgId, vendorId: result.vendorId, accessToken: "manual", encryptedAdminKey },
           });
         } catch {
-          // Encryption failed — billing still works, just won't auto-refresh
+          // Connection marker failed — billing data still saved
         }
       }
     }
