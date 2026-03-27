@@ -419,6 +419,10 @@ export async function fetchAWS(key: string): Promise<BillingResult | null> {
     if (name === "AccessDeniedException") {
       return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: false, verifyError: "Key lacks Cost Explorer access — attach the inline policy" };
     }
+    if (name === "DataUnavailableException") {
+      // Cost Explorer takes up to 24h to ingest data on new accounts — treat as connected
+      return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: true, billingAccess: true };
+    }
     // Surface any other AWS error so the user can see what's happening
     return { vendorId: "aws", planName: "AWS Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: `${name}: ${msg}` };
   }
