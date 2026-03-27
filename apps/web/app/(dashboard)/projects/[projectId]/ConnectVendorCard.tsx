@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const OAUTH_VENDORS = [
   { id: "stripe", name: "Stripe" },
-  { id: "google", name: "Google Cloud" },
-  { id: "vercel", name: "Vercel" },
 ] as const;
 
 const MANUAL_VENDORS = [
@@ -25,14 +23,6 @@ const MANUAL_VENDORS = [
     hint: "Paste as AccountSID:AuthToken — find both on your Twilio console homepage.",
     helpUrl: "https://console.twilio.com/",
     helpLabel: "Find AccountSID & AuthToken →",
-  },
-  {
-    id: "sendgrid",
-    name: "SendGrid",
-    placeholder: "SG.…",
-    hint: "API key with at least Stats > Read access.",
-    helpUrl: "https://app.sendgrid.com/settings/api_keys",
-    helpLabel: "Create API key →",
   },
 ] as const;
 
@@ -53,10 +43,7 @@ interface OpenAIRowState {
   open: boolean;
 }
 
-export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId: string; detectedVendorIds: string[] }) {
-  const allKnown = [...OAUTH_VENDORS.map(v => v.id), "openai", ...MANUAL_VENDORS.map(v => v.id)];
-  const relevant = detectedVendorIds.filter(id => allKnown.includes(id));
-  const showAll = relevant.length === 0; // fallback: show all if no scans yet
+export function ConnectVendorCard({ projectId }: { projectId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const connectedParam = searchParams.get("connected");
@@ -288,7 +275,7 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
           One-click connect
         </p>
         <div className="stack gap-8">
-          {OAUTH_VENDORS.filter(v => showAll || relevant.includes(v.id)).map((vendor) => {
+          {OAUTH_VENDORS.map((vendor) => {
             const isConnected = connected.includes(vendor.id);
             return (
               <div
@@ -344,7 +331,7 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
         </div>
         <div className="stack gap-8">
           {/* OpenAI — special two-input flow */}
-          {(showAll || relevant.includes("openai")) && (() => {
+          {(() => {
             const isConnected = connected.includes("openai") || openaiRow.status === "done";
             return (
               <div
@@ -440,7 +427,7 @@ export function ConnectVendorCard({ projectId, detectedVendorIds }: { projectId:
           })()}
 
           {/* Other manual vendors */}
-          {MANUAL_VENDORS.filter(v => showAll || relevant.includes(v.id)).map((vendor) => {
+          {MANUAL_VENDORS.map((vendor) => {
             const row = manualRows[vendor.id];
             return (
               <div

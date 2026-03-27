@@ -274,6 +274,14 @@ model SpendSnapshot {
   @@index([projectId, monthYear])
 }
 
+// ─── Waitlist ─────────────────────────────────────────────────────────────────
+model Waitlist {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("landing") // "landing" | "twitter" | etc.
+  createdAt DateTime @default(now())
+}
+
 // ─── Vendor OAuth Connections ─────────────────────────────────────────────────
 model VendorConnection {
   id               String   @id @default(cuid())

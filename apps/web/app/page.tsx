@@ -1,43 +1,30 @@
-import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
+"use client";
 
-export default async function LandingPage() {
-  const session = await auth();
-  if (session?.user) redirect("/dashboard");
+import { useState } from "react";
 
-  const features = [
-    {
-      icon: "⬡",
-      title: "Detect every vendor",
-      body: "Static analysis across imports, env vars, HTTP calls, package manifests, and API key patterns. 35+ vendors out of the box.",
-    },
-    {
-      icon: "⚡",
-      title: "Track runtime usage",
-      body: "Ingest real usage events from your services. Map requests, tokens, and cost to each vendor per environment.",
-    },
-    {
-      icon: "💡",
-      title: "Find wasted spend",
-      body: "Compare included plan capacity against observed usage. Surface underused subscriptions automatically.",
-    },
-    {
-      icon: "⇌",
-      title: "Recommend alternatives",
-      body: "Get vendor-specific recommendations with estimated savings percentages and tradeoff notes.",
-    },
-    {
-      icon: "🔒",
-      title: "Secrets stay redacted",
-      body: "API key patterns are detected and redacted during scanning. Raw values are never stored.",
-    },
-    {
-      icon: "▸",
-      title: "VS Code extension",
-      body: "Scan your local workspace in one click and push findings to your dashboard without leaving the editor.",
-    },
-  ];
+export default function LandingPage() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [msg, setMsg] = useState("");
+
+  async function joinWaitlist(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setStatus("done");
+      setMsg("You're on the list — check your email.");
+    } catch {
+      setStatus("error");
+      setMsg("Something went wrong. Try again.");
+    }
+  }
 
   return (
     <>
@@ -47,54 +34,92 @@ export default async function LandingPage() {
             width: 28, height: 28, borderRadius: 7,
             background: "linear-gradient(135deg, #1a56db 0%, #0ea47a 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 14, fontWeight: 900, color: "#fff"
+            fontSize: 14, fontWeight: 900, color: "#fff",
           }}>G</div>
           <span className="gradient-text">Gauge</span>
-        </div>
-        <div className="row gap-12">
-          <Link href="/login" className="btn btn-ghost btn-sm">Sign in</Link>
-          <Link href="/login" className="btn btn-primary btn-sm">Get started free</Link>
         </div>
       </nav>
 
       <section className="landing-hero">
         <div className="container" style={{ paddingTop: 80 }}>
-          <div style={{ maxWidth: 720, margin: "0 auto", textAlign: "center", padding: "80px 20px 60px" }}>
+          <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center", padding: "80px 20px 60px" }}>
             <div className="badge badge-accent" style={{ marginBottom: 20, fontSize: 12 }}>
-              Open beta — free to start
+              Private beta — join the waitlist
             </div>
-            <h1 style={{ fontSize: 56, fontWeight: 900, lineHeight: 1.05, marginBottom: 20, letterSpacing: "-0.03em" }}>
-              <span className="gradient-text">Gauge</span> your API spend.<br />
-              Stop wasting money.
+            <h1 style={{ fontSize: 52, fontWeight: 900, lineHeight: 1.05, marginBottom: 20, letterSpacing: "-0.03em" }}>
+              See exactly what you&apos;re spending<br />
+              across <span className="gradient-text">every API</span>
             </h1>
-            <p className="muted" style={{ fontSize: 19, lineHeight: 1.65, marginBottom: 36 }}>
-              Connect your codebase. Gauge detects every third-party API, tracks runtime usage,
-              finds underused plans, and recommends cheaper alternatives — all in one dashboard.
+            <p className="muted" style={{ fontSize: 18, lineHeight: 1.65, marginBottom: 40 }}>
+              Connect your OpenAI, Stripe, Twilio, and AWS accounts.
+              Gauge pulls real billing data, spots wasted spend, and shows
+              you what switching vendors would actually save.
             </p>
-            <div className="row gap-12" style={{ justifyContent: "center" }}>
-              <Link href="/login" className="btn btn-primary btn-lg">Start for free →</Link>
-              <a href="#features" className="btn btn-secondary btn-lg">See how it works</a>
-            </div>
-            <p className="muted small" style={{ marginTop: 16 }}>
-              Sign in with GitHub · No credit card required
+
+            {status === "done" ? (
+              <div style={{
+                padding: "16px 24px",
+                borderRadius: 12,
+                background: "rgba(14,164,122,0.1)",
+                border: "1px solid rgba(14,164,122,0.3)",
+                color: "var(--good)",
+                fontWeight: 600,
+                fontSize: 15,
+              }}>
+                {msg}
+              </div>
+            ) : (
+              <form onSubmit={joinWaitlist} style={{ display: "flex", gap: 10, maxWidth: 440, margin: "0 auto" }}>
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  style={{
+                    flex: 1,
+                    padding: "12px 16px",
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "var(--panel)",
+                    color: "var(--fg)",
+                    fontSize: 15,
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={status === "loading"}
+                  className="btn btn-primary"
+                  style={{ padding: "12px 20px", fontSize: 15, whiteSpace: "nowrap" }}
+                >
+                  {status === "loading" ? "Joining…" : "Join waitlist"}
+                </button>
+              </form>
+            )}
+            {status === "error" && (
+              <p style={{ color: "var(--danger)", marginTop: 8, fontSize: 13 }}>{msg}</p>
+            )}
+            <p className="muted small" style={{ marginTop: 14 }}>
+              No spam. Just an email when your spot is ready.
             </p>
           </div>
 
-          {/* Mini dashboard preview */}
-          <div style={{ maxWidth: 860, margin: "0 auto 80px", padding: "0 20px" }}>
+          {/* Dashboard preview */}
+          <div style={{ maxWidth: 820, margin: "0 auto 80px", padding: "0 20px" }}>
             <div className="card" style={{ padding: 0, overflow: "hidden", border: "1px solid rgba(59,130,246,0.2)" }}>
               <div style={{ background: "var(--panel-2)", borderBottom: "1px solid var(--border)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 6 }}>
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f87171" }} />
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#fbbf24" }} />
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22d3a8" }} />
-                <span className="muted small" style={{ marginLeft: 8 }}>Gauge Dashboard — my-saas / production</span>
+                <span className="muted small" style={{ marginLeft: 8 }}>Gauge — my-startup / production</span>
               </div>
               <div style={{ padding: 20 }}>
                 <div className="grid-3" style={{ marginBottom: 16 }}>
                   {[
-                    { label: "Monthly API Spend", value: "$799", sub: "3 active vendors" },
-                    { label: "Unused Spend", value: "$74", sub: "Detected underuse" },
-                    { label: "Alt Stack Estimate", value: "$340", sub: "57% savings possible" },
+                    { label: "Monthly spend", value: "$843", sub: "4 vendors tracked" },
+                    { label: "Wasted spend", value: "$210", sub: "Unused capacity" },
+                    { label: "Potential savings", value: "$180/mo", sub: "vs cheaper alternatives" },
                   ].map((k) => (
                     <div key={k.label} className="card-sm">
                       <div className="kpi-label">{k.label}</div>
@@ -107,26 +132,24 @@ export default async function LandingPage() {
                   <thead>
                     <tr>
                       <th>Vendor</th>
-                      <th>Detected via</th>
                       <th>Monthly</th>
-                      <th>Unused</th>
+                      <th>Wasted</th>
                       <th>Best alternative</th>
                       <th>Savings</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[
-                      { vendor: "OpenAI", via: "import", cat: "ai", monthly: "$480", unused: "$0", alt: "Groq (Llama 3)", savings: "60%" },
-                      { vendor: "SendGrid", via: "env var", cat: "email", monthly: "$99", unused: "$74", alt: "Resend", savings: "30%" },
-                      { vendor: "Stripe", via: "dependency", cat: "payments", monthly: "$220", unused: "$0", alt: "—", savings: "5%" },
+                      { vendor: "OpenAI", monthly: "$480", wasted: "$0", alt: "Anthropic Claude", savings: "25%" },
+                      { vendor: "Twilio", monthly: "$143", wasted: "$143", alt: "Vonage", savings: "15%" },
+                      { vendor: "Stripe", monthly: "$220", wasted: "$0", alt: "—", savings: "—" },
                     ].map((r) => (
                       <tr key={r.vendor}>
-                        <td><span style={{ fontWeight: 600 }}>{r.vendor}</span></td>
-                        <td><span className="badge badge-accent">{r.via}</span></td>
+                        <td style={{ fontWeight: 600 }}>{r.vendor}</td>
                         <td style={{ fontWeight: 600 }}>{r.monthly}</td>
-                        <td style={{ color: r.unused !== "$0" ? "var(--warn)" : "var(--muted)" }}>{r.unused}</td>
+                        <td style={{ color: r.wasted !== "$0" ? "var(--warn)" : "var(--muted)" }}>{r.wasted}</td>
                         <td className="muted">{r.alt}</td>
-                        <td><span style={{ color: "var(--good)", fontWeight: 700 }}>{r.savings}</span></td>
+                        <td style={{ color: r.savings !== "—" ? "var(--good)" : "var(--muted)", fontWeight: r.savings !== "—" ? 700 : 400 }}>{r.savings}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -137,18 +160,22 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <section id="features" style={{ padding: "80px 0", background: "var(--panel)", borderTop: "1px solid var(--border)" }}>
+      {/* How it works */}
+      <section style={{ padding: "80px 0", background: "var(--panel)", borderTop: "1px solid var(--border)" }}>
         <div className="container">
-          <h2 style={{ fontSize: 36, fontWeight: 900, textAlign: "center", marginBottom: 12, letterSpacing: "-0.02em" }}>
-            Everything you need to control API costs
+          <h2 style={{ fontSize: 32, fontWeight: 900, textAlign: "center", marginBottom: 48, letterSpacing: "-0.02em" }}>
+            How it works
           </h2>
-          <p className="muted" style={{ textAlign: "center", fontSize: 16, marginBottom: 48 }}>
-            From static code analysis to runtime telemetry to actionable recommendations.
-          </p>
           <div className="grid-3" style={{ gap: 20 }}>
-            {features.map((f) => (
-              <div key={f.title} className="card" style={{ padding: 24 }}>
-                <div style={{ fontSize: 28, marginBottom: 12 }}>{f.icon}</div>
+            {[
+              { step: "1", title: "Connect your vendors", body: "Link OpenAI, Stripe, Twilio, and AWS with your API keys. Takes under 2 minutes. Keys are stored encrypted — never shared." },
+              { step: "2", title: "See your real spend", body: "Gauge pulls live billing data directly from each vendor's API. No estimates, no guessing — actual dollars by service." },
+              { step: "3", title: "Find savings", body: "See which plans have unused capacity, which vendors have cheaper alternatives, and exactly how much you'd save by switching." },
+            ].map((f) => (
+              <div key={f.step} className="card" style={{ padding: 24 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #1a56db, #0ea47a)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 14, marginBottom: 14 }}>
+                  {f.step}
+                </div>
                 <div className="heading-sm" style={{ marginBottom: 8 }}>{f.title}</div>
                 <p className="muted small" style={{ lineHeight: 1.65 }}>{f.body}</p>
               </div>
@@ -157,19 +184,9 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <section style={{ padding: "80px 20px", textAlign: "center", background: "var(--bg)" }}>
-        <h2 style={{ fontSize: 36, fontWeight: 900, marginBottom: 16, letterSpacing: "-0.02em" }}>
-          Ready to stop overpaying?
-        </h2>
-        <p className="muted" style={{ fontSize: 16, marginBottom: 32 }}>
-          Sign in with GitHub and run your first scan in under 2 minutes.
-        </p>
-        <Link href="/login" className="btn btn-primary btn-lg">Get started for free →</Link>
-      </section>
-
       <footer style={{ borderTop: "1px solid var(--border)", padding: "24px 40px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontWeight: 700 }} className="gradient-text">Gauge</span>
-        <span className="muted small">Gauge your API spend. Stop wasting money.</span>
+        <span className="muted small">© 2026 Gauge. Built in public.</span>
       </footer>
     </>
   );

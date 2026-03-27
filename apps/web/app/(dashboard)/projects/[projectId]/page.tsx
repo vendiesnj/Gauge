@@ -49,7 +49,10 @@ export default async function ProjectDetailPage({
   });
 
   // Build cost insights
-  const plans = project.vendorPlans.map((p) => ({
+  // Only show vendors we have real billing API connections for
+  const connectedPlans = project.vendorPlans.filter((p) => p.source === "billing_api");
+
+  const plans = connectedPlans.map((p) => ({
     vendorId: p.vendorId,
     planName: p.planName,
     monthlySpendUsd: p.monthlySpendUsd ?? undefined,
@@ -74,7 +77,7 @@ export default async function ProjectDetailPage({
   const totalSpend = insights.reduce((s, i) => s + i.monthlySpendUsd, 0);
   const totalUnused = insights.reduce((s, i) => s + i.estimatedUnusedSpendUsd, 0);
   const totalAlt = insights.reduce((s, i) => s + (i.alternativeStackMonthlyUsd ?? i.monthlySpendUsd), 0);
-  const hasEstimates = project.vendorPlans.some((p) => p.source === "estimated");
+  const hasEstimates = false;
 
   // Latest scan
   const latestScan = project.scans[0];
@@ -222,7 +225,7 @@ export default async function ProjectDetailPage({
 
         {/* Right — connect vendors */}
         <div>
-          <ConnectVendorCard projectId={projectId} detectedVendorIds={detectedVendors.map(v => v.vendorId)} />
+          <ConnectVendorCard projectId={projectId} />
         </div>
       </div>
     </div>
