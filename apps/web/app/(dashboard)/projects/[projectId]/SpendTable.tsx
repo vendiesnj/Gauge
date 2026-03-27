@@ -6,7 +6,33 @@ import type { VendorCostInsight } from "@api-spend/shared";
 
 interface SpendTableProps {
   insights: VendorCostInsight[];
-  plans: Array<{ vendorId: string; planName: string; unit?: string }>;
+  plans: Array<{ vendorId: string; planName: string; unit?: string; usageIncluded?: number }>;
+}
+
+function formatUsage(amount: number, unit: string): string {
+  if (unit === "tokens") {
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M tokens`;
+    if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)}K tokens`;
+    return `${amount} tokens`;
+  }
+  if (unit === "messages") return `${amount.toLocaleString()} messages`;
+  if (unit === "$ volume processed") return `$${Math.round(amount).toLocaleString()} volume`;
+  return `${amount.toLocaleString()} ${unit}`;
+}
+
+function formatRate(spendUsd: number, usage: number, unit: string): string {
+  if (unit === "tokens" && usage > 0) {
+    const perMillion = (spendUsd / usage) * 1_000_000;
+    return `$${perMillion.toFixed(2)} / 1M tokens`;
+  }
+  if (unit === "messages" && usage > 0) {
+    return `$${(spendUsd / usage).toFixed(4)} / message`;
+  }
+  if (unit === "$ volume processed" && usage > 0) {
+    const pct = (spendUsd / usage) * 100;
+    return `~${pct.toFixed(2)}% effective fee rate`;
+  }
+  return `$${(spendUsd / usage).toFixed(4)} / ${unit}`;
 }
 
 export function SpendTable({ insights, plans }: SpendTableProps) {
@@ -111,10 +137,20 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
                             <span className="muted">Monthly spend</span>
                             <span style={{ fontWeight: 600 }}>${insight.monthlySpendUsd.toFixed(2)}</span>
                           </div>
-                          {insight.effectiveUnitCostUsd != null && (
+                          {plan?.unit && plan.usageIncluded != null && plan.usageIncluded > 0 && (
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                              <span className="muted">Effective unit cost</span>
-                              <span style={{ fontWeight: 600 }}>${insight.effectiveUnitCostUsd.toFixed(6)} / {plan?.unit ?? "unit"}</span>
+                              <span className="muted">Usage this month</span>
+                              <span style={{ fontWeight: 600 }}>
+                                {formatUsage(plan.usageIncluded, plan.unit)}
+                              </span>
+                            </div>
+                          )}
+                          {plan?.unit && plan.usageIncluded != null && plan.usageIncluded > 0 && hasSpend && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                              <span className="muted">Effective rate</span>
+                              <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+                                {formatRate(insight.monthlySpendUsd, plan.usageIncluded, plan.unit)}
+                              </span>
                             </div>
                           )}
                           {insight.estimatedUnusedSpendUsd > 0 && (
@@ -125,7 +161,7 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
                           )}
                           {!hasSpend && (
                             <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-                              No spend recorded yet — data will update after your next billing cycle.
+                              No spend recorded yet — data will appear after your next billing cycle.
                             </p>
                           )}
                         </div>

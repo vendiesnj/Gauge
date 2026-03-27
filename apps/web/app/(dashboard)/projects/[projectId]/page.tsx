@@ -62,6 +62,13 @@ export default async function ProjectDetailPage({
     unit: p.unit ?? undefined,
   }));
 
+  const planDisplayData = connectedPlans.map((p) => ({
+    vendorId: p.vendorId,
+    planName: p.planName,
+    unit: p.unit ?? undefined,
+    usageIncluded: p.usageIncluded ?? undefined,
+  }));
+
   const events = usageEvents.map((e) => ({
     vendorId: e.vendorId,
     timestamp: e.timestamp.toISOString(),
@@ -160,7 +167,7 @@ export default async function ProjectDetailPage({
                 <div className="heading-sm">Spend & recommendations</div>
                 <RecalculateButton projectId={projectId} />
               </div>
-              <SpendTable insights={insights} plans={plans} />
+              <SpendTable insights={insights} plans={planDisplayData} />
               {insights.some((i) => i.notes.length > 0) && (
                 <div style={{ marginTop: 12 }}>
                   {insights.flatMap((i) => i.notes).map((note, idx) => (

@@ -50,8 +50,8 @@ export async function POST(req: NextRequest) {
 
   await db.vendorPlan.upsert({
     where: { projectId_vendorId: { projectId: gaugeProjectId, vendorId: "openai" } },
-    update: { planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
-    create: { projectId: gaugeProjectId, vendorId: "openai", planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, source: "billing_api" },
+    update: { planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, usageIncluded: billing.usageIncluded ?? null, unit: billing.unit ?? null, source: "billing_api" },
+    create: { projectId: gaugeProjectId, vendorId: "openai", planName: billing.planName, monthlySpendUsd: billing.monthlySpendUsd, usageIncluded: billing.usageIncluded ?? null, unit: billing.unit ?? null, source: "billing_api" },
   });
 
   return NextResponse.json({ connected: true, monthlySpendUsd: billing.monthlySpendUsd });

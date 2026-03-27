@@ -31,50 +31,68 @@ export async function fetchOpenAI(key: string): Promise<BillingResult | null> {
       `https://api.openai.com/v1/organization/costs?start_time=${startOfMonth}&bucket_width=1d&limit=31`,
       { headers }
     );
-    if (costsRes.ok) {
-      const data = await costsRes.json();
-      let totalCost = 0;
-      for (const bucket of data.data ?? []) {
-        for (const result of bucket.results ?? []) {
-          const val = result.amount?.value ?? result.amount ?? 0;
-          totalCost += Number(val) || 0;
-        }
-      }
-      return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
-    }
-
-    if (costsRes.status === 403) {
-      // Key is valid but lacks billing permission — fall back to usage API
-    } else if (costsRes.status === 401) {
+    if (costsRes.status === 401) {
       return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: 0, source: "billing_api", keyValid: false, billingAccess: false, verifyError: "Invalid key" };
     }
 
-    // Costs API failed — fall back to usage API with per-model pricing
+    // Fetch token usage regardless of which cost path we took — needed for $/token metric
+    const MODEL_PRICING: Record<string, [number, number]> = {
+      "gpt-4o":        [2.50, 10.00],
+      "gpt-4o-mini":   [0.15,  0.60],
+      "gpt-4-turbo":   [10.00, 30.00],
+      "gpt-4":         [30.00, 60.00],
+      "o1":            [15.00, 60.00],
+      "o1-mini":       [3.00,  12.00],
+      "o3-mini":       [1.10,   4.40],
+      "gpt-3.5-turbo": [0.50,   1.50],
+    };
+
     const usageRes = await fetch(
       `https://api.openai.com/v1/organization/usage/completions?start_time=${startOfMonth}&limit=100`,
       { headers }
     );
 
+    let totalTokens = 0;
+    let usageCost = 0;
     if (usageRes.ok) {
       const data = await usageRes.json();
-      const MODEL_PRICING: Record<string, [number, number]> = {
-        "gpt-4o":        [2.50, 10.00],
-        "gpt-4o-mini":   [0.15,  0.60],
-        "gpt-4-turbo":   [10.00, 30.00],
-        "gpt-4":         [30.00, 60.00],
-        "o1":            [15.00, 60.00],
-        "o1-mini":       [3.00,  12.00],
-        "o3-mini":       [1.10,   4.40],
-        "gpt-3.5-turbo": [0.50,   1.50],
-      };
-      let totalCost = 0;
       for (const item of data.data ?? []) {
         const model: string = item.model ?? "";
+        const input = item.input_tokens ?? 0;
+        const output = item.output_tokens ?? 0;
+        totalTokens += input + output;
         const modelKey = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k)) ?? "gpt-4o";
         const [inputRate, outputRate] = MODEL_PRICING[modelKey];
-        totalCost += ((item.input_tokens ?? 0) / 1_000_000) * inputRate + ((item.output_tokens ?? 0) / 1_000_000) * outputRate;
+        usageCost += (input / 1_000_000) * inputRate + (output / 1_000_000) * outputRate;
       }
-      return { vendorId: "openai", planName: "Pay-as-you-go", monthlySpendUsd: Math.round(totalCost * 100) / 100, source: "billing_api", keyValid: true, billingAccess: true };
+    }
+
+    // Use costs API for accurate $ if it worked, otherwise fall back to usage-computed cost
+    if (costsRes.ok) {
+      const data = await costsRes.json();
+      let totalCost = 0;
+      for (const bucket of data.data ?? []) {
+        for (const result of bucket.results ?? []) {
+          totalCost += Number(result.amount?.value ?? result.amount ?? 0) || 0;
+        }
+      }
+      return {
+        vendorId: "openai", planName: "Pay-as-you-go",
+        monthlySpendUsd: Math.round(totalCost * 100) / 100,
+        usageIncluded: totalTokens > 0 ? totalTokens : undefined,
+        unit: totalTokens > 0 ? "tokens" : undefined,
+        source: "billing_api", keyValid: true, billingAccess: true,
+      };
+    }
+
+    if (usageCost > 0 || totalTokens > 0) {
+      return {
+        vendorId: "openai", planName: "Pay-as-you-go",
+        monthlySpendUsd: Math.round(usageCost * 100) / 100,
+        usageIncluded: totalTokens > 0 ? totalTokens : undefined,
+        unit: totalTokens > 0 ? "tokens" : undefined,
+        source: "billing_api", keyValid: true, billingAccess: true,
+      };
     }
 
     // Key valid but no billing scope
@@ -218,21 +236,30 @@ async function fetchTwilio(key: string): Promise<BillingResult | null> {
     if (!authToken) return null;
 
     const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Usage/Records/ThisMonth.json?Category=totalprice`,
-      { headers: { Authorization: `Basic ${credentials}` } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
+    const headers = { Authorization: `Basic ${credentials}` };
 
-    const record = data.usage_records?.[0];
-    const spend = record ? parseFloat(record.price ?? "0") : 0;
+    const [priceRes, smsRes] = await Promise.all([
+      fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Usage/Records/ThisMonth.json?Category=totalprice`, { headers }),
+      fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Usage/Records/ThisMonth.json?Category=sms`, { headers }),
+    ]);
+
+    if (!priceRes.ok) return null;
+    const priceData = await priceRes.json();
+    const spend = parseFloat(priceData.usage_records?.[0]?.price ?? "0");
+
+    let messageCount: number | undefined;
+    if (smsRes.ok) {
+      const smsData = await smsRes.json();
+      const count = parseInt(smsData.usage_records?.[0]?.count ?? "0", 10);
+      if (count > 0) messageCount = count;
+    }
 
     return {
       vendorId: "twilio",
       planName: "Pay-as-you-go",
       monthlySpendUsd: Math.round(spend * 100) / 100,
-      unit: "this month",
+      usageIncluded: messageCount,
+      unit: messageCount !== undefined ? "messages" : undefined,
       source: "billing_api",
     };
   } catch {

@@ -86,6 +86,8 @@ export async function POST(
         update: {
           planName: result.planName,
           monthlySpendUsd: result.monthlySpendUsd,
+          usageIncluded: result.usageIncluded ?? null,
+          unit: result.unit ?? null,
           source: "billing_api",
         },
         create: {
@@ -93,6 +95,8 @@ export async function POST(
           vendorId: result.vendorId,
           planName: result.planName,
           monthlySpendUsd: result.monthlySpendUsd,
+          usageIncluded: result.usageIncluded ?? null,
+          unit: result.unit ?? null,
           source: "billing_api",
         },
       });
