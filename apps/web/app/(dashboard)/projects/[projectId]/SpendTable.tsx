@@ -9,6 +9,25 @@ interface SpendTableProps {
   plans: Array<{ vendorId: string; planName: string; unit?: string; usageIncluded?: number }>;
 }
 
+// Published per-unit pricing rates for key vendors (used when actual spend = $0)
+const PUBLISHED_RATES: Record<string, { rateUsd: number; per: number; label: string }> = {
+  openai:    { rateUsd: 2.50,   per: 1_000_000, label: "$2.50 / 1M tokens"  },
+  anthropic: { rateUsd: 3.00,   per: 1_000_000, label: "$3.00 / 1M tokens"  },
+  groq:      { rateUsd: 0.27,   per: 1_000_000, label: "$0.27 / 1M tokens"  },
+  mistral:   { rateUsd: 0.70,   per: 1_000_000, label: "$0.70 / 1M tokens"  },
+  twilio:    { rateUsd: 0.0079, per: 1,          label: "$0.0079 / SMS"      },
+  vonage:    { rateUsd: 0.0063, per: 1,          label: "$0.0063 / SMS"      },
+  resend:    { rateUsd: 0.001,  per: 1,          label: "$0.001 / email"     },
+  sendgrid:  { rateUsd: 0.0006, per: 1,          label: "$0.0006 / email"    },
+  stripe:    { rateUsd: 0.029,  per: 1,          label: "2.9% of volume"     },
+};
+
+function estimateCost(vendorId: string, usageQuantity: number): number | null {
+  const rate = PUBLISHED_RATES[vendorId];
+  if (!rate || usageQuantity <= 0) return null;
+  return (usageQuantity / rate.per) * rate.rateUsd;
+}
+
 function formatUsage(amount: number, unit: string): string {
   if (unit === "tokens") {
     if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M tokens`;
@@ -63,6 +82,25 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
           const isOpen = !!expanded[insight.vendorId];
           const hasSpend = insight.monthlySpendUsd > 0;
 
+          // Compute usage-based cost estimates for $0-spend vendors
+          const usageQty = plan?.usageIncluded ?? 0;
+          const estimatedCurrentCost = !hasSpend ? estimateCost(insight.vendorId, usageQty) : null;
+          const altSavingsPct = alt?.estimatedSavingsPct ?? (vendor?.category === "ai" ? 60 : 20);
+          const estimatedAltCost = estimatedCurrentCost != null
+            ? estimatedCurrentCost * (1 - altSavingsPct / 100)
+            : null;
+          const estimatedSavings = estimatedCurrentCost != null && estimatedAltCost != null
+            ? estimatedCurrentCost - estimatedAltCost
+            : null;
+
+          // Effective display values: prefer real spend, fall back to estimates
+          const displayAlt = insight.alternativeStackMonthlyUsd ?? (estimatedAltCost ?? undefined);
+          const displaySavingsPct = insight.savingsVsAlternativePct ?? (
+            estimatedCurrentCost != null && estimatedCurrentCost > 0
+              ? altSavingsPct
+              : undefined
+          );
+
           return (
             <>
               <tr key={insight.vendorId}>
@@ -76,17 +114,18 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
                   )}
                 </td>
                 <td>
-                  {insight.alternativeStackMonthlyUsd != null && hasSpend ? (
+                  {displayAlt != null && altVendor ? (
                     <span>
-                      ${insight.alternativeStackMonthlyUsd.toFixed(0)}
-                      {altVendor && <span className="muted small"> ({altVendor.name})</span>}
+                      ~${displayAlt.toFixed(0)}
+                      {!hasSpend && <span className="muted small"> est.</span>}
+                      <span className="muted small"> ({altVendor.name})</span>
                     </span>
                   ) : "—"}
                 </td>
                 <td>
-                  {insight.savingsVsAlternativePct != null && hasSpend ? (
+                  {displaySavingsPct != null ? (
                     <span className="text-good" style={{ fontWeight: 700 }}>
-                      {insight.savingsVsAlternativePct.toFixed(0)}%
+                      {displaySavingsPct.toFixed(0)}%
                     </span>
                   ) : "—"}
                 </td>
@@ -137,19 +176,27 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
                             <span className="muted">Monthly spend</span>
                             <span style={{ fontWeight: 600 }}>${insight.monthlySpendUsd.toFixed(2)}</span>
                           </div>
-                          {plan?.unit && plan.usageIncluded != null && plan.usageIncluded > 0 && (
+                          {plan?.unit && usageQty > 0 && (
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                               <span className="muted">Usage this month</span>
                               <span style={{ fontWeight: 600 }}>
-                                {formatUsage(plan.usageIncluded, plan.unit)}
+                                {formatUsage(usageQty, plan.unit)}
                               </span>
                             </div>
                           )}
-                          {plan?.unit && plan.usageIncluded != null && plan.usageIncluded > 0 && hasSpend && (
+                          {plan?.unit && usageQty > 0 && hasSpend && (
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                               <span className="muted">Effective rate</span>
                               <span style={{ fontWeight: 700, color: "var(--accent)" }}>
-                                {formatRate(insight.monthlySpendUsd, plan.usageIncluded, plan.unit)}
+                                {formatRate(insight.monthlySpendUsd, usageQty, plan.unit)}
+                              </span>
+                            </div>
+                          )}
+                          {plan?.unit && usageQty > 0 && !hasSpend && PUBLISHED_RATES[insight.vendorId] && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                              <span className="muted">Published rate</span>
+                              <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+                                {PUBLISHED_RATES[insight.vendorId].label}
                               </span>
                             </div>
                           )}
@@ -159,9 +206,9 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
                               <span style={{ fontWeight: 600, color: "var(--warn)" }}>${insight.estimatedUnusedSpendUsd.toFixed(2)} wasted</span>
                             </div>
                           )}
-                          {!hasSpend && (
+                          {!hasSpend && usageQty === 0 && (
                             <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-                              No spend recorded yet — data will appear after your next billing cycle.
+                              No usage recorded yet — data will appear after your next billing cycle.
                             </p>
                           )}
                         </div>
@@ -178,6 +225,8 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
                               <span className="muted">Alternative</span>
                               <span style={{ fontWeight: 600, color: "var(--accent)" }}>{altVendor.name}</span>
                             </div>
+
+                            {/* Case 1: Real spend data */}
                             {hasSpend && insight.alternativeStackMonthlyUsd != null && (
                               <>
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
@@ -192,6 +241,32 @@ export function SpendTable({ insights, plans }: SpendTableProps) {
                                 </div>
                               </>
                             )}
+
+                            {/* Case 2: Usage data, no spend — show estimated comparison */}
+                            {!hasSpend && estimatedCurrentCost != null && estimatedAltCost != null && (
+                              <>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                                  <span className="muted">Your usage cost (~{insight.vendorName})</span>
+                                  <span style={{ fontWeight: 600 }}>~${estimatedCurrentCost.toFixed(2)}/mo</span>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                                  <span className="muted">Same usage on {altVendor.name}</span>
+                                  <span style={{ fontWeight: 600 }}>~${estimatedAltCost.toFixed(2)}/mo</span>
+                                </div>
+                                {estimatedSavings != null && estimatedSavings > 0 && (
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                                    <span className="muted">Potential savings</span>
+                                    <span style={{ fontWeight: 700, color: "var(--good)" }}>
+                                      ~${estimatedSavings.toFixed(2)}/mo ({altSavingsPct}% less)
+                                    </span>
+                                  </div>
+                                )}
+                                <p style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.5, marginTop: 2 }}>
+                                  Estimates based on published rates — connect billing to see actuals.
+                                </p>
+                              </>
+                            )}
+
                             <p style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, marginTop: 4 }}>
                               {alt.rationale}
                             </p>
