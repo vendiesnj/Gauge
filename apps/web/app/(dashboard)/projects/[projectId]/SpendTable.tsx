@@ -240,7 +240,7 @@ function SpendRow({
               <span className="muted small"> ({altVendor.name})</span>
             </span>
           ) : altVendor && savingsPct != null && savingsPct >= 5 ? (
-            <span className="muted small">{savingsPct}% cheaper ({altVendor.name})</span>
+            <span className="muted small">{altVendor.name}</span>
           ) : "—"}
         </td>
         <td>

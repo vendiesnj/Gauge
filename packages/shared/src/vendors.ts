@@ -34,8 +34,8 @@ export const VENDORS: VendorDefinition[] = [
     planDiscovery: { canOAuth: false, notes: "Billing access is account-scoped via console." },
     cheaperAlternativeHeadline: "Claude Haiku is competitive on cost for simpler tasks.",
     alternatives: [
-      { vendorId: "openai", rationale: "GPT-4o mini is cheaper for simple classification.", estimatedSavingsPct: 10 },
-      { vendorId: "groq", rationale: "Llama 3 on Groq for high-throughput low-latency use cases.", estimatedSavingsPct: 55 },
+      { vendorId: "groq", rationale: "Llama 3 on Groq for high-throughput low-latency use cases, drastically cheaper per token.", estimatedSavingsPct: 55 },
+      { vendorId: "openai", rationale: "GPT-4o mini is cheaper for simple classification tasks.", estimatedSavingsPct: 10 },
     ],
   },
   {
@@ -547,8 +547,8 @@ export const VENDORS: VendorDefinition[] = [
     pricingModel: "per_request",
     planDiscovery: { canOAuth: true, notes: "AWS Cost Explorer API available with IAM cost:* permissions." },
     alternatives: [
-      { vendorId: "gcp", rationale: "GCP often cheaper for compute-heavy workloads.", estimatedSavingsPct: 10 },
-      { vendorId: "cloudflare", rationale: "Cloudflare Workers/R2 drastically cheaper for edge + storage.", estimatedSavingsPct: 40 },
+      { vendorId: "cloudflare", rationale: "Cloudflare Workers/R2 is drastically cheaper for edge compute and storage use cases.", estimatedSavingsPct: 40 },
+      { vendorId: "gcp", rationale: "GCP can be cheaper for compute-heavy workloads with committed use discounts.", estimatedSavingsPct: 10 },
     ],
   },
   {
