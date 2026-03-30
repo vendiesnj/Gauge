@@ -17,9 +17,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="app-shell">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-logo" style={{ gap: 0 }}>
-          <img src="/logo.png" alt="G" style={{ width: 38, height: 38, display: "block", mixBlendMode: "multiply" }} />
-          <span className="gradient-text" style={{ marginLeft: -2 }}>auge</span>
+        <div className="sidebar-logo" style={{ padding: "16px 18px" }}>
+          <img src="/logo.png" alt="Gauge" style={{ height: 38, width: "auto", display: "block", mixBlendMode: "multiply" }} />
         </div>
 
         <nav className="sidebar-nav">
