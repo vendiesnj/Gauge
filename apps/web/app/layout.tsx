@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Space_Grotesk } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {`(function(){try{var t=localStorage.getItem('gauge-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`}
         </Script>
         {children}
+        <Analytics />
       </body>
     </html>
   );
