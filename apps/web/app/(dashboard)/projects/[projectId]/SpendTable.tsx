@@ -157,7 +157,6 @@ export function SpendTable({ insights, plans, inputs, onInputChange }: SpendTabl
               hasUsage={hasUsage}
               usageQty={usageQty}
               savingsPct={savingsPct}
-              altSavingsPct={altSavingsPct}
               displayAlt={displayAlt}
               estimatedCurrentCost={estimatedCurrentCost}
               estimatedAltCost={estimatedAltCost}
@@ -179,7 +178,7 @@ export function SpendTable({ insights, plans, inputs, onInputChange }: SpendTabl
 // Extracted to avoid massive inline JSX — keeps the map() readable
 function SpendRow({
   insight, plan, alt, altVendor, rate, altRate,
-  hasSpend, hasUsage, usageQty, savingsPct, altSavingsPct,
+  hasSpend, hasUsage, usageQty, savingsPct,
   displayAlt, estimatedCurrentCost, estimatedAltCost,
   inputRaw, inputQty, inputCurrentCost, inputAltCost,
   onInputChange, formatUsage, formatRate,
@@ -194,7 +193,6 @@ function SpendRow({
   hasUsage: boolean;
   usageQty: number;
   savingsPct?: number;
-  altSavingsPct: number;
   displayAlt?: number;
   estimatedCurrentCost: number | null;
   estimatedAltCost: number | null;
@@ -216,27 +214,43 @@ function SpendRow({
     <>
       <tr>
         <td style={{ fontWeight: 600 }}>{insight.vendorName}</td>
-        <td>{formatMoney(insight.monthlySpendUsd)}</td>
+        <td>
+          {inputCurrentCost != null ? (
+            <span>
+              {formatMoney(inputCurrentCost, true)}
+              <span className="muted small"> est.</span>
+            </span>
+          ) : formatMoney(insight.monthlySpendUsd)}
+        </td>
         <td>
           {insight.estimatedUnusedSpendUsd > 0
             ? <span className="text-warn">{formatMoney(insight.estimatedUnusedSpendUsd)}</span>
             : <span className="muted">—</span>}
         </td>
         <td>
-          {displayAlt != null && altVendor && savingsPct != null && savingsPct >= 5 ? (
+          {inputAltCost != null && altVendor ? (
+            <span>
+              {formatMoney(inputAltCost, true)}
+              <span className="muted small"> est. ({altVendor.name})</span>
+            </span>
+          ) : displayAlt != null && altVendor && savingsPct != null && savingsPct >= 5 ? (
             <span>
               {formatMoney(displayAlt, !hasSpend)}
               {!hasSpend && hasUsage && <span className="muted small"> est.</span>}
               <span className="muted small"> ({altVendor.name})</span>
             </span>
           ) : altVendor && savingsPct != null && savingsPct >= 5 ? (
-            <span className="muted small">{savingsPct}% cheaper</span>
+            <span className="muted small">{savingsPct}% cheaper ({altVendor.name})</span>
           ) : "—"}
         </td>
         <td>
-          {savingsPct != null && savingsPct >= 5
-            ? <span className="text-good" style={{ fontWeight: 700 }}>{savingsPct}%</span>
-            : "—"}
+          {inputCurrentCost != null && inputAltCost != null && inputCurrentCost > inputAltCost ? (
+            <span className="text-good" style={{ fontWeight: 700 }}>
+              {Math.round((1 - inputAltCost / inputCurrentCost) * 100)}%
+            </span>
+          ) : savingsPct != null && savingsPct >= 5 ? (
+            <span className="text-good" style={{ fontWeight: 700 }}>{savingsPct}%</span>
+          ) : "—"}
         </td>
         <td>
           <button
